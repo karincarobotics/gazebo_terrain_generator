@@ -6,8 +6,8 @@
   <sdf version="1.9">model.sdf</sdf>
 
   <author>
-    <name>Sai Aravind</name>
-    <email>bplacearavind@gmail.com</email>
+    <name>Polymath Robotics</name>
+    <email>engineer@polymathrobotics.com</email>
   </author>
 
   <description>

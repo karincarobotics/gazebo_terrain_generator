@@ -50,7 +50,7 @@ $(function() {
 		map = new mapboxgl.Map({
 			container: 'map-view',
 			style: 'mapbox://styles/aliashraf/ck6lw9nr80lvo1ipj8zovttdx',
-			center: [-73.983652, 40.755024], 
+			center: [-73.983652, 40.755024],
 			zoom: 12
 		});
 
@@ -90,13 +90,30 @@ $(function() {
 		}
 	}
 
-	function initializeSearch() {
-		$("#search-form").submit(function(e) {
-			var location = $("#location-box").val();
-			geocoder.query(location);
+	function isCoordinate(input) {
+		// Matches "lng,lat", "lng, lat", or "lng lat" with optional surrounding spaces
+		return /^-?\d+(\.\d+)?(\s*,\s*|\s+)-?\d+(\.\d+)?$/.test(input.trim());
+	}
 
+	function initializeSearch() {
+		// geocoder.on('result', function(e) {
+		// 	var coords = e.result.geometry.coordinates; // [lng, lat]
+		// 	map.flyTo({ center: coords, zoom: 14 });
+		// });
+
+		$("#search-form").submit(function(e) {
 			e.preventDefault();
-		})
+			var location = $("#location-box").val().trim();
+
+			if (isCoordinate(location)) {
+				var parts = location.split(/[\s,]+/);
+				var lat = parseFloat(parts[0]);
+				var lng = parseFloat(parts[1]);
+				map.flyTo({ center: [lng, lat], zoom: 17 });
+			} else {
+				geocoder.query(location);
+			}
+		});
 	}
 
 	function initializeMoreOptions() {
@@ -113,7 +130,7 @@ $(function() {
 	}
 
 	function initializeRectangleTool() {
-		
+
 		var modes = MapboxDraw.modes;
 		modes.draw_rectangle = DrawRectangle.default;
 
@@ -137,16 +154,16 @@ $(function() {
 
 				// Get current zoom level for tile calculations
 				var zoomLevel = getMaxZoom();
-				
+
 				// Convert bounds to corners following Python logic
 				var boundArray = originalBounds;
-				
+
 				// Create corner coordinates (lat, lon) as in Python
 				var sw = [boundArray[1], boundArray[0]]; // (south, west)
 				var nw = [boundArray[3], boundArray[0]]; // (north, west)
 				var ne = [boundArray[3], boundArray[2]]; // (north, east)
 				var se = [boundArray[1], boundArray[2]]; // (south, east)
-				
+
 				// Convert to tile coordinates
 				var sw_tile_x = long2tile(sw[1], zoomLevel);
 				var sw_tile_y = lat2tile(sw[0], zoomLevel);
@@ -156,26 +173,26 @@ $(function() {
 				var ne_tile_y = lat2tile(ne[0], zoomLevel);
 				var se_tile_x = long2tile(se[1], zoomLevel);
 				var se_tile_y = lat2tile(se[0], zoomLevel);
-				
+
 				// Calculate height and width in tiles (following Python logic)
 				var height = Math.abs(sw_tile_y - nw_tile_y);
 				var width = Math.abs(ne_tile_x - nw_tile_x);
-				
+
 				console.log("Original bounds:", originalBounds);
 				console.log("Tile coordinates:", {
 					sw: [sw_tile_x, sw_tile_y],
-					nw: [nw_tile_x, nw_tile_y], 
+					nw: [nw_tile_x, nw_tile_y],
 					ne: [ne_tile_x, ne_tile_y],
 					se: [se_tile_x, se_tile_y]
 				});
 				console.log("Calculated dimensions - width:", width, "height:", height);
-				
+
 				var tileBounds;
 				if (height !== width) {
 					// Make it square by taking the minimum dimension
 					var squareSize = Math.min(height, width);
 					console.log("Making square with size:", squareSize);
-					
+
 					// Start from northwest corner and extend square size
 					tileBounds = {
 						"northwest": [nw_tile_x, nw_tile_y],
@@ -191,15 +208,15 @@ $(function() {
 						"southeast": [se_tile_x, se_tile_y]
 					};
 				}
-				
+
 				console.log("Final tile bounds:", tileBounds);
-				
+
 				// Convert tile bounds back to geographic coordinates with consistent logic
 				var true_nw = [tile2lat(tileBounds.northwest[1], zoomLevel), tile2long(tileBounds.northwest[0], zoomLevel)]; // (north, west)
 				var true_ne = [tile2lat(tileBounds.northeast[1], zoomLevel), tile2long(tileBounds.northeast[0], zoomLevel)]; // (north, east)
 				var true_sw = [tile2lat(tileBounds.southwest[1], zoomLevel), tile2long(tileBounds.southwest[0], zoomLevel)]; // (south, west)
 				var true_se = [tile2lat(tileBounds.southeast[1], zoomLevel), tile2long(tileBounds.southeast[0], zoomLevel)]; // (south, east)
-				
+
 				// Create the snapped bounds array [west, south, east, north] - ensure perfect rectangle
 				var snappedBounds = [
 					Math.min(true_nw[1], true_sw[1]), // west (minimum longitude)
@@ -207,7 +224,7 @@ $(function() {
 					Math.max(true_ne[1], true_se[1]), // east (maximum longitude)
 					Math.max(true_nw[0], true_ne[0])  // north (maximum latitude)
 				];
-				
+
 				// Create perfectly rectangular coordinates for the polygon
 				var snappedCoordinates = [[
 					[snappedBounds[0], snappedBounds[1]], // SW: [west, south]
@@ -216,7 +233,7 @@ $(function() {
 					[snappedBounds[0], snappedBounds[3]], // NW: [west, north]
 					[snappedBounds[0], snappedBounds[1]]  // SW: close polygon
 				]];
-				
+
 				// Use a timeout to ensure the feature is fully created before updating
 				setTimeout(function() {
 					var featureId = e.features[0].id;
@@ -229,12 +246,12 @@ $(function() {
 						},
 						properties: e.features[0].properties
 					};
-					
+
 					// Update the feature
 					draw.delete(featureId);
 					draw.add(updatedFeature);
 				}, 50);
-				
+
 				window.launchBounds = snappedBounds;
 				var center = [
 					(snappedBounds[0] + snappedBounds[2]) / 2,
@@ -260,13 +277,13 @@ $(function() {
 				var squareTileWidth = Math.abs(tileBounds.northeast[0] - tileBounds.northwest[0]);
 				var squareTileHeight = Math.abs(tileBounds.southwest[1] - tileBounds.northwest[1]);
 				var tilesInSquare = squareTileWidth * squareTileHeight;
-				
+
 				// Clear any pending messages first
 				M.Toast.dismissAll();
-				
+
 				// Show success message with details
 				M.toast({
-					html: `Area snapped to a Square (${tilesInSquare} tiles total)`, 
+					html: `Area snapped to a Square (${tilesInSquare} tiles total)`,
 					displayLength: 4000
 				});
 			}
@@ -310,12 +327,12 @@ $(function() {
 		var content = "X, Y, Z<br/><b>" + x + ", " + y + ", " + maxZoom + "</b><hr/>";
 		content += "Lat, Lng<br/><b>" + e.lngLat.lat + ", " + e.lngLat.lng + "</b>";
 
-        new mapboxgl.Popup()
-            .setLngLat(e.lngLat)
-            .setHTML(content)
-            .addTo(map);
+		new mapboxgl.Popup()
+			.setLngLat(e.lngLat)
+			.setHTML(content)
+			.addTo(map);
 
-        console.log(e.lngLat)
+		console.log(e.lngLat)
 
 	}
 
@@ -516,20 +533,20 @@ $(function() {
 	}
 
 	function generateQuadKey(x, y, z) {
-	    var quadKey = [];
-	    for (var i = z; i > 0; i--) {
-	        var digit = '0';
-	        var mask = 1 << (i - 1);
-	        if ((x & mask) != 0) {
-	            digit++;
-	        }
-	        if ((y & mask) != 0) {
-	            digit++;
-	            digit++;
-	        }
-	        quadKey.push(digit);
-	    }
-	    return quadKey.join('');
+		var quadKey = [];
+		for (var i = z; i > 0; i--) {
+			var digit = '0';
+			var mask = 1 << (i - 1);
+			if ((x & mask) != 0) {
+				digit++;
+			}
+			if ((y & mask) != 0) {
+				digit++;
+				digit++;
+			}
+			quadKey.push(digit);
+		}
+		return quadKey.join('');
 	}
 
 	function initializeDownloader() {
@@ -569,25 +586,25 @@ $(function() {
 	}
 	// Function to poll the task status
 	async function pollTaskStatus() {
-	    try {
-	        // Call the /task-status endpoint
-	        var response = await $.ajax({
-	            url: "/task-status",
-	            async: true,
-	            timeout: 30 * 1000,
-	            type: "get",
-	            dataType: 'json',
-	        });
-			
+		try {
+			// Call the /task-status endpoint
+			var response = await $.ajax({
+				url: "/task-status",
+				async: true,
+				timeout: 30 * 1000,
+				type: "get",
+				dataType: 'json',
+			});
+
 			if (response.code === 200) {
 				var status = response.message.status; // Extract the status field
 				console.log("Task status:", status); // Debugging log
-	
+
 				// Check the task status
 				if (status === "completed") {
 					logItemRaw("Gazebo world generated successfully.");
 					$("#stop-button").html("FINISH");
-					
+
 					// Add the launch pad marker when generation is complete
 					createLaunchPadMarker();
 				} else if (status === "in_progress") {
@@ -599,10 +616,10 @@ $(function() {
 			} else {
 				logItemRaw("Unexpected response code: " + response.code);
 			}
-	    } catch (error) {
-	        logItemRaw("Error while checking task status: " + error.statusText);
-	        setTimeout(() => pollTaskStatus(taskId), 5000); // Retry after 5 seconds
-	    }
+		} catch (error) {
+			logItemRaw("Error while checking task status: " + error.statusText);
+			setTimeout(() => pollTaskStatus(taskId), 5000); // Retry after 5 seconds
+		}
 	}
 	async function startDownloading() {
 
@@ -611,7 +628,7 @@ $(function() {
 			return;
 		}
 
-		cancellationToken = false; 
+		cancellationToken = false;
 		requests = [];
 
 		$("#main-sidebar").hide();
@@ -632,9 +649,9 @@ $(function() {
 
 		var numThreads = parseInt($("#parallel-threads-box").val()) || 4;
 		var outputDirectory = $("#output-directory-box").val();
-		var outputFile = "{z}/{x}/{y}.png"; 
-		var outputType = "png"; 
-		var outputScale = "1"; 
+		var outputFile = "{z}/{x}/{y}.png";
+		var outputType = "png";
+		var outputScale = "1";
 		var source = $("#source-box").val()
 
 		var bounds = getBounds();
@@ -671,98 +688,98 @@ $(function() {
 		let i = 0;
 		var iterator = async.eachLimit(allTiles, numThreads, function(item, done) {
 
-			if(cancellationToken) {
-				return;
-			}
-
-			var boxLayer = previewRect(item);
-
-			var url = "/download-tile";
-
-			var data = new FormData();
-			data.append('x', item.x)
-			data.append('y', item.y)
-			data.append('z', item.z)
-			data.append('quad', generateQuadKey(item.x, item.y, item.z))
-			data.append('outputDirectory', outputDirectory)
-			data.append('outputFile', outputFile)
-			data.append('outputType', outputType)
-			data.append('outputScale', outputScale)
-			data.append('timestamp', timestamp)
-			data.append('source', source)
-			data.append('bounds', boundsArray.join(","))
-			data.append('center', centerArray.join(","))
-			data.append('launchLocation', launchLocation.join(","))
-			data.append('area', area_rect)
-			data.append('includeBuildlings', includeBuildlings)
-
-			var request = $.ajax({
-				"url": url,
-				async: true,
-				timeout: 30 * 1000,
-				type: "post",
-			    contentType: false,
-			    processData: false,
-				data: data,
-				dataType: 'json',
-			}).done(function(data) {
-
 				if(cancellationToken) {
 					return;
 				}
 
-				if(data.code == 200) {
-					showTinyTile(data.image)
-					logItem(item.x, item.y, item.z, data.message);
-				} else {
-					logItem(item.x, item.y, item.z, data.code + " Error downloading tile");
-				}
+				var boxLayer = previewRect(item);
 
-			}).fail(function(data, textStatus, errorThrown) {
+				var url = "/download-tile";
 
-				if(cancellationToken) {
-					return;
-				}
+				var data = new FormData();
+				data.append('x', item.x)
+				data.append('y', item.y)
+				data.append('z', item.z)
+				data.append('quad', generateQuadKey(item.x, item.y, item.z))
+				data.append('outputDirectory', outputDirectory)
+				data.append('outputFile', outputFile)
+				data.append('outputType', outputType)
+				data.append('outputScale', outputScale)
+				data.append('timestamp', timestamp)
+				data.append('source', source)
+				data.append('bounds', boundsArray.join(","))
+				data.append('center', centerArray.join(","))
+				data.append('launchLocation', launchLocation.join(","))
+				data.append('area', area_rect)
+				data.append('includeBuildlings', includeBuildlings)
 
-				logItem(item.x, item.y, item.z, "Error while relaying tile");
-				//allTiles.push(item);
+				var request = $.ajax({
+					"url": url,
+					async: true,
+					timeout: 30 * 1000,
+					type: "post",
+					contentType: false,
+					processData: false,
+					data: data,
+					dataType: 'json',
+				}).done(function(data) {
 
-			}).always(function(data) {
-				i++;
+					if(cancellationToken) {
+						return;
+					}
 
-				removeLayer(boxLayer);
-				updateProgress(i, allTiles.length);
+					if(data.code == 200) {
+						showTinyTile(data.image)
+						logItem(item.x, item.y, item.z, data.message);
+					} else {
+						logItem(item.x, item.y, item.z, data.code + " Error downloading tile");
+					}
 
-				done();
-				
-				if(cancellationToken) {
-					return;
-				}
-			});
+				}).fail(function(data, textStatus, errorThrown) {
 
-			requests.push(request);
+					if(cancellationToken) {
+						return;
+					}
 
-		}, async function(err) {
+					logItem(item.x, item.y, item.z, "Error while relaying tile");
+					//allTiles.push(item);
 
-			var request = await $.ajax({
-				url: "/end-download",
-				async: true,
-				timeout: 30 * 1000,
-				type: "post",
-				contentType: false,
-				processData: false,
-				data: data,
-				dataType: 'json',
-			})
+				}).always(function(data) {
+					i++;
 
-			updateProgress(allTiles.length, allTiles.length);
-			logItemRaw("Starting World Generation");
-			pollTaskStatus(); // Start polling with the task ID
+					removeLayer(boxLayer);
+					updateProgress(i, allTiles.length);
 
-		},
+					done();
+
+					if(cancellationToken) {
+						return;
+					}
+				});
+
+				requests.push(request);
+
+			}, async function(err) {
+
+				var request = await $.ajax({
+					url: "/end-download",
+					async: true,
+					timeout: 30 * 1000,
+					type: "post",
+					contentType: false,
+					processData: false,
+					data: data,
+					dataType: 'json',
+				})
+
+				updateProgress(allTiles.length, allTiles.length);
+				logItemRaw("Starting World Generation");
+				pollTaskStatus(); // Start polling with the task ID
+
+			},
 
 
-	);
+		);
 
 
 	}
@@ -799,27 +816,27 @@ $(function() {
 			// Process is complete, restore the main view
 			$("#main-sidebar").show();
 			$("#download-sidebar").hide();
-			
+
 			// Ensure the region selection is visible (if it was removed)
 			if (window.selectedRegion && draw.getAll().features.length === 0) {
 				draw.add(window.selectedRegion);
 			}
-			
+
 			// Ensure the launch pad marker is visible
-			
+
 			removeGrid();
 			clearLogs();
 			createLaunchPadMarker();
 
 			// Show completion message
 			M.toast({
-				html: 'Region and launch pad are now visible. Ready for next operation.', 
+				html: 'Region and launch pad are now visible. Ready for next operation.',
 				displayLength: 3000
 			});
-			
+
 			return;
 		}
-		
+
 		// Otherwise, it's a regular stop operation during download
 		cancellationToken = true;
 
@@ -858,8 +875,8 @@ $(function() {
 				element: helipadIcon,
 				draggable: true
 			})
-			.setLngLat(window.launchLocation)
-			.addTo(map);
+				.setLngLat(window.launchLocation)
+				.addTo(map);
 
 			// Constrain the helipad icon within the bounds
 			window.centerMarker.on('dragend', function() {

@@ -1,0 +1,156 @@
+/* Reset and base styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    overflow: hidden;
+}
+
+/* App container */
+#app {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+/* Header */
+header {
+    background: #2c3e50;
+    color: white;
+    padding: 1rem 2rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+}
+
+header h1 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+/* Main content area */
+main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* Map container */
+#map {
+    flex: 1;
+    position: relative;
+}
+
+/* Sidebar */
+#sidebar {
+    width: 350px;
+    background: white;
+    border-left: 1px solid #ddd;
+    overflow-y: auto;
+    box-shadow: -2px 0 4px rgba(0, 0, 0, 0.05);
+}
+
+.sidebar-content {
+    padding: 2rem;
+}
+
+.sidebar-content h2 {
+    font-size: 1.25rem;
+    margin-bottom: 1rem;
+    color: #2c3e50;
+}
+
+.sidebar-content p {
+    color: #555;
+    line-height: 1.6;
+}
+
+/* Floating search box */
+.floating-search {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 1;
+    background: white;
+    border-radius: 24px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+}
+
+.floating-search input {
+    width: 280px;
+    padding: 12px 16px;
+    border: none;
+    font-size: 14px;
+    font-family: monospace;
+    color: #333;
+    background: transparent;
+    outline: none;
+}
+
+.floating-search input:focus {
+    outline: none;
+}
+
+.floating-search:focus-within {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15), 0 0 0 2px rgba(52, 152, 219, 0.3);
+}
+
+.floating-search button {
+    padding: 12px 16px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.floating-search button:hover {
+    background: rgba(52, 152, 219, 0.1);
+}
+
+.floating-search button:active {
+    background: rgba(52, 152, 219, 0.2);
+}
+
+/* Mapbox controls customization */
+.mapboxgl-ctrl-top-right {
+    top: 10px;
+    right: 10px;
+}
+
+.mapboxgl-ctrl-bottom-left {
+    bottom: 10px;
+    left: 10px;
+}
+
+/* Marker cursor */
+.mapboxgl-marker {
+    cursor: move;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    #sidebar {
+        position: absolute;
+        right: -350px;
+        top: 0;
+        bottom: 0;
+        transition: right 0.3s ease;
+        z-index: 999;
+    }
+
+    #sidebar.open {
+        right: 0;
+    }
+}

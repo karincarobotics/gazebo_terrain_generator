@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gazebo Terrain Generator</title>
+
+    <!-- Mapbox GL JS -->
+    <link href='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css' rel='stylesheet' />
+    <script src='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js'></script>
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <!-- Application CSS -->
+    <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+    <div id="app">
+        <header>
+            <h1>Gazebo Terrain Generator</h1>
+        </header>
+
+        <main>
+            <div id="map">
+                <div id="search-box" class="floating-search">
+                    <input type="text" id="coordinate-input" placeholder="Enter coordinates (lat, lng)">
+                    <button type="button" id="search-button">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+            </div>
+
+            <aside id="sidebar">
+                <div class="sidebar-content">
+                    <h2>Welcome</h2>
+                    <p>Loading map...</p>
+                </div>
+            </aside>
+        </main>
+    </div>
+
+    <!-- Application JavaScript -->
+    <script src="js/main.js"></script>
+</body>
+</html>

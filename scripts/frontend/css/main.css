@@ -46,8 +46,8 @@ main {
     position: relative;
 }
 
-/* Sidebar */
-#sidebar {
+/* Sidebar - commented out */
+/* #sidebar {
     width: 350px;
     background: white;
     border-left: 1px solid #ddd;
@@ -68,7 +68,7 @@ main {
 .sidebar-content p {
     color: #555;
     line-height: 1.6;
-}
+} */
 
 /* Floating search box */
 .floating-search {
@@ -137,6 +137,80 @@ main {
 /* Marker cursor */
 .mapboxgl-marker {
     cursor: move;
+}
+
+/* Custom draw controls */
+.custom-draw-controls {
+    margin-top: 10px;
+}
+
+.custom-draw-controls button {
+    width: 29px;
+    height: 29px;
+    display: block;
+    padding: 0;
+    outline: none;
+    border: 0;
+    box-sizing: border-box;
+    background-color: transparent;
+    cursor: pointer;
+    color: #404040;
+}
+
+.custom-draw-controls button:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+/* Coordinate labels */
+.coordinate-label .mapboxgl-popup-content {
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+    font-family: monospace;
+    font-size: 11px;
+    padding: 4px 8px;
+    border-radius: 3px;
+}
+
+.coordinate-label .mapboxgl-popup-tip {
+    border-top-color: rgba(0, 0, 0, 0.8);
+}
+
+/* Vertex delete popup */
+.vertex-delete-popup .mapboxgl-popup-content {
+    padding: 4px;
+    background: white;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    border-radius: 50%;
+}
+
+.vertex-delete-popup .mapboxgl-popup-tip {
+    border-top-color: white;
+}
+
+.vertex-delete-popup.mapboxgl-popup-anchor-top .mapboxgl-popup-tip {
+    border-bottom-color: white;
+    border-top-color: transparent;
+}
+
+.delete-vertex-btn {
+    background: white;
+    color: black;
+    border: none;
+    padding: 8px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    transition: background 0.2s, color 0.2s;
+}
+
+.delete-vertex-btn:hover {
+    background: #f8f8f8;
+    color: #c0392b;
 }
 
 /* Responsive design */

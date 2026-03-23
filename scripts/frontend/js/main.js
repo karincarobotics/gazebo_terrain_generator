@@ -1,10 +1,16 @@
 // Main application entry point
-(function() {
+(function () {
     'use strict';
 
     let map = null;
     let mapboxApiKey = null;
     let centerMarker = null;
+    let draw = null;
+    let coordinateOverlays = [];
+    let showCoordinates = false;
+    let vertexDeletePopup = null;
+    let selectedVertex = null; // Store {featureId, coordIndex}
+    let mouseDownOnVertex = false;
 
     // Initialize the application
     async function init() {
@@ -54,20 +60,27 @@
         // Add scale control
         map.addControl(new mapboxgl.ScaleControl(), 'bottom-left');
 
-        map.on('load', function() {
+        map.on('load', function () {
             console.log('Map loaded successfully');
-            updateSidebar('Map ready! Select a region to begin.');
+
+            // Initialize drawing tools
+            initializeDrawing();
 
             // Add center marker after map loads
             addCenterMarker();
 
             // Setup search button
             setupSearchButton();
+
+            // Setup draw controls
+            setupDrawControls();
+
         });
 
-        map.on('error', function(e) {
+        map.on('error', function (e) {
             console.error('Map error:', e);
-            showError('Map failed to load properly.');
+            const errorMsg = e.error?.message || e.message || 'Unknown error';
+            showError('Unexpected runtime error: ' + errorMsg);
         });
     }
 
@@ -80,19 +93,19 @@
             draggable: true,
             color: '#e74c3c'
         })
-        .setLngLat([center.lng, center.lat])
-        .addTo(map);
+            .setLngLat([center.lng, center.lat])
+            .addTo(map);
 
         // Update coordinate input with initial position
         updateCoordinateInput(center.lat, center.lng);
 
         // Listen for drag events
-        centerMarker.on('drag', function() {
+        centerMarker.on('drag', function () {
             const lngLat = centerMarker.getLngLat();
             updateCoordinateInput(lngLat.lat, lngLat.lng);
         });
 
-        centerMarker.on('dragend', function() {
+        centerMarker.on('dragend', function () {
             const lngLat = centerMarker.getLngLat();
             console.log('Marker moved to:', lngLat.lat, lngLat.lng);
         });
@@ -112,11 +125,11 @@
         const input = document.getElementById('coordinate-input');
 
         if (searchButton && input) {
-            searchButton.addEventListener('click', function() {
+            searchButton.addEventListener('click', function () {
                 searchCoordinates();
             });
 
-            input.addEventListener('keypress', function(e) {
+            input.addEventListener('keypress', function (e) {
                 if (e.key === 'Enter') {
                     searchCoordinates();
                 }
@@ -149,30 +162,367 @@
 
             console.log('Searched coordinates:', lat, lng);
         } else {
-            alert('Invalid coordinates. Please use format: lat, lng (e.g., 39.778518, -86.246375)');
+            showError('Invalid coordinates. Please use format: lat, lng (e.g., 39.778518, -86.246375)');
         }
     }
 
-    // Update sidebar content
-    function updateSidebar(message) {
-        const sidebar = document.querySelector('.sidebar-content');
-        if (sidebar) {
-            sidebar.innerHTML = `
-                <h2>Getting Started</h2>
-                <p>${message}</p>
-            `;
+    // Initialize drawing tools
+    function initializeDrawing() {
+        draw = new MapboxDraw({
+            displayControlsDefault: false,
+            controls: {},
+            defaultMode: 'simple_select'
+        });
+
+        map.addControl(draw, 'top-right');
+
+        // Listen for draw events
+        map.on('draw.create', onDrawCreate);
+        map.on('draw.update', onDrawUpdate);
+        map.on('draw.delete', onDrawDelete);
+        map.on('draw.selectionchange', onSelectionChange);
+
+        // Set up drag detection
+        setupDragDetection();
+
+        // Add keyboard listener for delete key
+        document.addEventListener('keydown', handleKeyPress);
+
+        // Add right-click handler for vertices
+        setupVertexContextMenu();
+    }
+
+    // Handle draw create event
+    function onDrawCreate(e) {
+        console.log('Polygon created:', e.features);
+        updateCoordinateOverlays();
+    }
+
+    // Handle draw update event
+    function onDrawUpdate(e) {
+        console.log('Polygon updated:', e.features);
+        updateCoordinateOverlays();
+    }
+
+    // Handle draw delete event
+    function onDrawDelete(e) {
+        console.log('Polygon deleted:', e.features);
+        clearCoordinateOverlays();
+        hideVertexDeletePopup();
+    }
+
+    // Handle selection change
+    function onSelectionChange(e) {
+        // Remove old popup first
+        if (vertexDeletePopup) {
+            vertexDeletePopup.remove();
+            vertexDeletePopup = null;
         }
+
+        if (e.features.length > 0 && e.points && e.points.length > 0) {
+            // A vertex is selected
+            const point = e.points[0];
+            const feature = e.features[0];
+
+            console.log('Selection event:', e);
+            console.log('Point:', point);
+            console.log('Feature:', feature);
+
+            // Find which vertex was clicked by matching coordinates
+            const clickedCoord = point.geometry.coordinates;
+            const featureCoords = feature.geometry.coordinates[0];
+
+            let coordIndex = -1;
+            for (let i = 0; i < featureCoords.length - 1; i++) { // -1 to skip closing point
+                if (Math.abs(featureCoords[i][0] - clickedCoord[0]) < 0.000001 &&
+                    Math.abs(featureCoords[i][1] - clickedCoord[1]) < 0.000001) {
+                    coordIndex = i;
+                    break;
+                }
+            }
+
+            if (coordIndex >= 0) {
+                selectedVertex = {
+                    featureId: feature.id,
+                    coordIndex: coordIndex
+                };
+                console.log('Vertex selected at index:', coordIndex);
+                // Mark that mouse is down on a vertex
+                mouseDownOnVertex = true;
+                showVertexDeletePopup(point);
+            }
+        } else {
+            // No vertex selected, clear everything
+            selectedVertex = null;
+            mouseDownOnVertex = false;
+        }
+    }
+
+    // Setup drag detection
+    function setupDragDetection() {
+        map.on('mousemove', function (e) {
+            if (mouseDownOnVertex && vertexDeletePopup) {
+                console.log('Drag detected, hiding popup');
+                hideVertexDeletePopup();
+            }
+        });
+
+        map.on('mouseup', function (e) {
+            if (selectedVertex) {
+                const feature = draw.get(selectedVertex.featureId);
+                const coords = feature.geometry.coordinates[0][selectedVertex.coordIndex];
+                showVertexDeletePopup({geometry: {coordinates: coords}});
+            }
+            mouseDownOnVertex = false;
+        });
+    }
+
+    // Setup vertex context menu (right-click)
+    function setupVertexContextMenu() {
+        map.on('contextmenu', function (e) {
+            // Check if we're clicking on a draw feature
+            const features = map.queryRenderedFeatures(e.point);
+            const isDrawFeature = features.some(f =>
+                f.source === 'mapbox-gl-draw-cold' ||
+                f.source === 'mapbox-gl-draw-hot'
+            );
+
+            if (isDrawFeature && selectedVertex) {
+                e.preventDefault();
+                deleteSelectedVertex();
+            }
+        });
+    }
+
+    // Handle keyboard events
+    function handleKeyPress(e) {
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+            if (selectedVertex) {
+                e.preventDefault();
+                deleteSelectedVertex();
+            }
+        }
+    }
+
+    // Show vertex delete popup
+    function showVertexDeletePopup(point) {
+        // Remove old popup if exists
+        if (vertexDeletePopup) {
+            vertexDeletePopup.remove();
+            vertexDeletePopup = null;
+        }
+
+        const coords = [point.geometry.coordinates[0], point.geometry.coordinates[1]];
+
+        vertexDeletePopup = new mapboxgl.Popup({
+            closeButton: false,
+            closeOnClick: false,
+            className: 'vertex-delete-popup',
+            anchor: 'top',
+            offset: 15
+        })
+            .setLngLat(coords)
+            .setHTML('<button id="delete-vertex-btn" class="delete-vertex-btn"><i class="fas fa-trash-alt"></i></button>')
+            .addTo(map);
+
+        // Add click handler to delete button
+        setTimeout(function () {
+            const deleteBtn = document.getElementById('delete-vertex-btn');
+            if (deleteBtn) {
+                deleteBtn.onclick = function (e) {
+                    e.stopPropagation();
+                    console.log('Delete button clicked, selectedVertex:', selectedVertex);
+                    deleteSelectedVertex();
+                };
+            }
+        }, 0);
+    }
+
+    // Hide vertex delete popup
+    function hideVertexDeletePopup() {
+        if (vertexDeletePopup) {
+            vertexDeletePopup.remove();
+            vertexDeletePopup = null;
+        }
+        //selectedVertex = null;
+    }
+
+    // Delete selected vertex
+    function deleteSelectedVertex() {
+        if (!selectedVertex) {
+            console.log('No vertex selected');
+            return;
+        }
+
+        console.log('Attempting to delete vertex:', selectedVertex);
+
+        // Get the feature by ID
+        const allFeatures = draw.getAll().features;
+        const feature = allFeatures.find(f => f.id === selectedVertex.featureId);
+
+        if (!feature) {
+            console.log('Feature not found');
+            return;
+        }
+
+        if (feature.geometry.type !== 'Polygon') {
+            console.log('Selected feature is not a polygon');
+            return;
+        }
+
+        const coordinates = feature.geometry.coordinates[0].slice(); // Make a copy
+
+        // Don't allow deletion if polygon would have less than 4 points (3 unique + closing)
+        if (coordinates.length <= 4) {
+            showError('Cannot delete vertex: polygon must have at least 3 vertices');
+            return;
+        }
+
+        const coordIndex = selectedVertex.coordIndex;
+
+        console.log('Deleting vertex at index:', coordIndex, 'from', coordinates.length, 'coordinates');
+
+        // Remove the vertex
+        coordinates.splice(coordIndex, 1);
+
+        // Ensure the polygon is closed (first and last points are the same)
+        if (coordIndex === 0) {
+            coordinates[coordinates.length - 1] = [coordinates[0][0], coordinates[0][1]];
+        }
+
+        // Update the feature
+        const featureId = feature.id;
+        const updatedFeature = {
+            id: featureId,
+            type: 'Feature',
+            geometry: {
+                type: 'Polygon',
+                coordinates: [coordinates]
+            },
+            properties: feature.properties
+        };
+
+        draw.delete(featureId);
+        draw.add(updatedFeature);
+        draw.changeMode('simple_select', {featureIds: [featureId]});
+
+        hideVertexDeletePopup();
+        updateCoordinateOverlays();
+
+        console.log('Vertex deleted successfully. New coordinate count:', coordinates.length);
+    }
+
+    // Setup draw control buttons
+    function setupDrawControls() {
+        // Create custom control container
+        const controlContainer = document.createElement('div');
+        controlContainer.className = 'mapboxgl-ctrl mapboxgl-ctrl-group custom-draw-controls';
+
+        // Draw polygon button
+        const drawButton = document.createElement('button');
+        drawButton.className = 'mapbox-gl-draw_ctrl-draw-btn';
+        drawButton.title = 'Draw polygon';
+        drawButton.innerHTML = '<i class="fas fa-draw-polygon"></i>';
+        drawButton.onclick = function () {
+            // Clear existing polygons
+            draw.deleteAll();
+            clearCoordinateOverlays();
+            // Start drawing
+            draw.changeMode('draw_polygon');
+        };
+
+        // Toggle coordinates button
+        const coordButton = document.createElement('button');
+        coordButton.className = 'mapbox-gl-draw_ctrl-draw-btn';
+        coordButton.title = 'Toggle coordinate labels';
+        coordButton.innerHTML = '<i class="fas fa-tag"></i>';
+        coordButton.onclick = function () {
+            showCoordinates = !showCoordinates;
+            coordButton.style.backgroundColor = showCoordinates ? '#3bb2d0' : '';
+            updateCoordinateOverlays();
+        };
+
+        controlContainer.appendChild(drawButton);
+        controlContainer.appendChild(coordButton);
+
+        // Add to map
+        map.getContainer().querySelector('.mapboxgl-ctrl-top-right').appendChild(controlContainer);
+    }
+
+    // Update coordinate overlays
+    function updateCoordinateOverlays() {
+        clearCoordinateOverlays();
+
+        if (!showCoordinates) return;
+
+        const features = draw.getAll().features;
+        features.forEach(function (feature) {
+            if (feature.geometry.type === 'Polygon') {
+                const coordinates = feature.geometry.coordinates[0];
+                coordinates.forEach(function (coord, index) {
+                    // Skip last coordinate (same as first)
+                    if (index === coordinates.length - 1) return;
+
+                    const popup = new mapboxgl.Popup({
+                        closeButton: false,
+                        closeOnClick: false,
+                        className: 'coordinate-label'
+                    })
+                        .setLngLat(coord)
+                        .setHTML(`${coord[1].toFixed(6)}, ${coord[0].toFixed(6)}`)
+                        .addTo(map);
+
+                    coordinateOverlays.push(popup);
+                });
+            }
+        });
+    }
+
+    // Clear coordinate overlays
+    function clearCoordinateOverlays() {
+        coordinateOverlays.forEach(function (popup) {
+            popup.remove();
+        });
+        coordinateOverlays = [];
     }
 
     // Show error message
     function showError(message) {
-        const sidebar = document.querySelector('.sidebar-content');
-        if (sidebar) {
-            sidebar.innerHTML = `
-                <h2>Error</h2>
-                <p style="color: #e74c3c;">${message}</p>
-            `;
-        }
+        console.error(message);
+        Toastify({
+            text: message,
+            duration: 5000,
+            gravity: "top",
+            position: "center",
+            backgroundColor: "linear-gradient(to right, #e74c3c, #c0392b)",
+            stopOnFocus: true
+        }).showToast();
+    }
+
+    // Show success message
+    function showSuccess(message) {
+        console.log(message);
+        Toastify({
+            text: message,
+            duration: 3000,
+            gravity: "top",
+            position: "center",
+            backgroundColor: "linear-gradient(to right, #00b09b, #96c93d)",
+            stopOnFocus: true
+        }).showToast();
+    }
+
+    // Show info message
+    function showInfo(message) {
+        console.log(message);
+        Toastify({
+            text: message,
+            duration: 3000,
+            gravity: "top",
+            position: "center",
+            backgroundColor: "linear-gradient(to right, #3498db, #2980b9)",
+            stopOnFocus: true
+        }).showToast();
     }
 
     // Start the application when DOM is ready

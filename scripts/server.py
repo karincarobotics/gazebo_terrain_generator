@@ -79,6 +79,10 @@ def validate_mapbox_key(api_key):
         return False 
 
 
+@app.route('/api/mapbox-key', methods=['GET'])
+def get_mapbox_key():
+	return jsonify({"code": 200, "apiKey": globalParam.MAPBOX_API_KEY})
+
 @app.route('/task-status', methods=['GET'])
 def task_status_endpoint():
 	global task_status
@@ -182,16 +186,25 @@ def end_download():
 
 	return jsonify({"code": 200, "message": "Download ended"})
 
-@app.route('/', defaults={'path': 'index.htm'})
+@app.route('/', defaults={'path': 'index.html'})
 @app.route('/<path:path>')
 def serve_static(path):
+	file_dir = os.path.join(str(Path(__file__).resolve().parent), 'frontend')
+	mime_type, _ = mimetypes.guess_type(path)
+	return send_from_directory(file_dir, path, mimetype=mime_type)
+
+#VTODO: remove once new frontend is fully functional
+@app.route('/old/', defaults={'path': 'index.htm'})
+@app.route('/old/<path:path>')
+def serve_static_old(path):
 	file_dir = os.path.join(str(Path(__file__).resolve().parent), 'UI')
 	mime_type, _ = mimetypes.guess_type(path)
 	return send_from_directory(file_dir, path, mimetype=mime_type)
+
 
 if __name__ == '__main__':
 	
 	if not validate_mapbox_key(globalParam.MAPBOX_API_KEY):
 		exit(1)
 	print("Starting Flask server...")
-	app.run(host='0.0.0.0', port=8080, threaded=True)
+	app.run(host='127.0.0.1', port=8080, threaded=True)

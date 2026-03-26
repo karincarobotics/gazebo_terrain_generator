@@ -405,7 +405,7 @@ main {
     transform: translateX(18px);
 }
 
-/* Revert to defaults button */
+/* Revert to Defaults button */
 .settings-revert-btn {
     width: 100%;
     margin-top: 8px;

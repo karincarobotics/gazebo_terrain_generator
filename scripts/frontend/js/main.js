@@ -12,6 +12,8 @@
     let selectedVertex = null; // Store {featureId, coordIndex}
     let mouseDownOnVertex = false;
     let gridVisible = false;
+    let generationCancelled = false;
+    let pollingTimer = null;
     const GRID_LAYER_ID = 'grid-preview';
     const STORAGE_KEY = 'gazebo_terrain_generator_settings';
 
@@ -626,9 +628,307 @@
         return true;
     }
 
-    // Generate terrain (stub — to be implemented with console UI)
-    function generateTerrain() {
-        showSuccess('Validation passed. Generation coming soon...');
+    // --- Generation flow ---
+
+    async function generateTerrain() {
+        // Reverse geocode center marker for suggested name
+        const lngLat = centerMarker.getLngLat();
+        let suggested = 'world';
+        try {
+            suggested = await fetchModelName(lngLat.lng, lngLat.lat);
+        } catch (e) {
+            console.warn('Reverse geocoding failed, using fallback name');
+        }
+
+        const modelName = await showNameModal(suggested);
+        if (!modelName) return; // User cancelled
+
+        await startGeneration(modelName);
+    }
+
+    async function fetchModelName(lng, lat) {
+        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?types=locality,place,region&limit=1&access_token=${mapboxApiKey}`;
+        const resp = await fetch(url);
+        const data = await resp.json();
+        if (data.features && data.features.length > 0) {
+            const text = data.features[0].text || data.features[0].place_name.split(',')[0];
+            const slug = text.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+            return slug.charAt(0).toUpperCase() + slug.slice(1);
+        }
+        return 'World';
+    }
+
+    function showNameModal(suggested) {
+        return new Promise(function (resolve) {
+            const overlay = document.getElementById('name-modal-overlay');
+            const input = document.getElementById('name-modal-input');
+            const confirmBtn = document.getElementById('name-modal-confirm');
+            const cancelBtn = document.getElementById('name-modal-cancel');
+
+            input.value = suggested;
+            overlay.classList.add('open');
+            input.focus();
+            input.select();
+
+            function confirm() {
+                const name = input.value.trim();
+                if (!name) return;
+                cleanup();
+                resolve(name);
+            }
+
+            function cancel() {
+                cleanup();
+                resolve(null);
+            }
+
+            function onKeyDown(e) {
+                if (e.key === 'Enter') confirm();
+                if (e.key === 'Escape') cancel();
+            }
+
+            function cleanup() {
+                overlay.classList.remove('open');
+                confirmBtn.removeEventListener('click', confirm);
+                cancelBtn.removeEventListener('click', cancel);
+                input.removeEventListener('keydown', onKeyDown);
+            }
+
+            confirmBtn.addEventListener('click', confirm);
+            cancelBtn.addEventListener('click', cancel);
+            input.addEventListener('keydown', onKeyDown);
+        });
+    }
+
+    async function startGeneration(modelName) {
+        generationCancelled = false;
+
+        const timestamp = Date.now().toString();
+        const outputFile = '{z}/{x}/{y}.png';
+        const zoomLevel = config.zoomLevel;
+        const source = config.tileSource;
+        const includeBuildlings = config.includeBuildings;
+        const parallelDownloads = config.parallelDownloads;
+
+        // Compute bounds and pivot
+        const polygon = draw.getAll().features[0];
+        const coords = polygon.geometry.coordinates[0];
+        const lngs = coords.map(c => c[0]);
+        const lats = coords.map(c => c[1]);
+        const west = Math.min(...lngs), east = Math.max(...lngs);
+        const south = Math.min(...lats), north = Math.max(...lats);
+        const bounds = [west, south, east, north];
+        const center = [(west + east) / 2, (south + north) / 2];
+        const lngLat = centerMarker.getLngLat();
+        const launchLocation = [lngLat.lng, lngLat.lat];
+        const area = turf.area(polygon);
+
+        const tiles = getTiles(zoomLevel);
+
+        showConsole();
+        logToConsole(`${tiles.length} tiles queued at zoom ${zoomLevel}`, 'info');
+        updateConsoleProgress(0, tiles.length);
+
+        // POST /start-download
+        try {
+            const startData = new FormData();
+            startData.append('maxZoom', zoomLevel);
+            startData.append('outputDirectory', modelName);
+            startData.append('outputFile', outputFile);
+            startData.append('timestamp', timestamp);
+            startData.append('bounds', bounds.join(','));
+            startData.append('center', center.join(','));
+            startData.append('launchLocation', launchLocation.join(','));
+            startData.append('area', area);
+            startData.append('includeBuildlings', includeBuildlings);
+            startData.append('source', source);
+            const startResp = await fetch('/start-download', { method: 'POST', body: startData });
+            const startResult = await startResp.json();
+            if (startResult.code !== 200) throw new Error('start-download failed: ' + startResult.message);
+        } catch (e) {
+            logToConsole('Error: ' + e.message, 'error');
+            setConsoleStatus('failed');
+            return;
+        }
+
+        // Download tiles with concurrency
+        let completed = 0;
+        await runWithConcurrency(tiles, parallelDownloads, async function (tile) {
+            if (generationCancelled) return;
+
+            const tileData = new FormData();
+            tileData.append('x', tile.x);
+            tileData.append('y', tile.y);
+            tileData.append('z', tile.z);
+            tileData.append('quad', generateQuadKey(tile.x, tile.y, tile.z));
+            tileData.append('outputDirectory', modelName);
+            tileData.append('outputFile', outputFile);
+            tileData.append('timestamp', timestamp);
+            tileData.append('source', source);
+            tileData.append('bounds', bounds.join(','));
+            tileData.append('center', center.join(','));
+            tileData.append('launchLocation', launchLocation.join(','));
+            tileData.append('area', area);
+            tileData.append('includeBuildlings', includeBuildlings);
+
+            try {
+                const resp = await fetch('/download-tile', { method: 'POST', body: tileData });
+                const result = await resp.json();
+                completed++;
+                updateConsoleProgress(completed, tiles.length);
+                logToConsole(`[${tile.x},${tile.y},${tile.z}] ${result.message}`);
+            } catch (e) {
+                logToConsole(`[${tile.x},${tile.y},${tile.z}] Error: ${e.message}`, 'error');
+            }
+        });
+
+        if (generationCancelled) return;
+
+        // POST /end-download
+        logToConsole('All tiles downloaded. Building Gazebo world...', 'info');
+        setConsoleStatus('Generating...');
+
+        try {
+            const endData = new FormData();
+            endData.append('maxZoom', zoomLevel);
+            endData.append('outputDirectory', modelName);
+            endData.append('outputFile', outputFile);
+            endData.append('timestamp', timestamp);
+            endData.append('bounds', bounds.join(','));
+            endData.append('includeBuildlings', includeBuildlings);
+            const endResp = await fetch('/end-download', { method: 'POST', body: endData });
+            const endResult = await endResp.json();
+            if (endResult.code !== 200) throw new Error('end-download failed');
+        } catch (e) {
+            logToConsole('Error: ' + e.message, 'error');
+            setConsoleStatus('failed');
+            return;
+        }
+
+        pollGenerationStatus();
+    }
+
+    async function pollGenerationStatus() {
+        if (generationCancelled) return;
+        try {
+            const resp = await fetch('/task-status');
+            const data = await resp.json();
+            const status = data.message.status;
+
+            if (status === 'completed') {
+                logToConsole('Gazebo world generated successfully!', 'success');
+                setConsoleStatus('completed');
+                setConsoleCloseMode();
+            } else if (status === 'failed') {
+                logToConsole('World generation failed on server.', 'error');
+                setConsoleStatus('failed');
+                setConsoleCloseMode();
+            } else {
+                pollingTimer = setTimeout(pollGenerationStatus, 3000);
+            }
+        } catch (e) {
+            logToConsole('Error polling status: ' + e.message, 'error');
+            pollingTimer = setTimeout(pollGenerationStatus, 5000);
+        }
+    }
+
+    function generateQuadKey(x, y, z) {
+        const quadKey = [];
+        for (let i = z; i > 0; i--) {
+            let digit = 0;
+            const mask = 1 << (i - 1);
+            if ((x & mask) !== 0) digit++;
+            if ((y & mask) !== 0) digit += 2;
+            quadKey.push(digit.toString());
+        }
+        return quadKey.join('');
+    }
+
+    // Returns tiles as {x, y, z} for a given zoom level
+    function getTiles(zoomLevel) {
+        const polygon = draw.getAll().features[0];
+        const coords = polygon.geometry.coordinates[0];
+        const lngs = coords.map(c => c[0]);
+        const lats = coords.map(c => c[1]);
+        const TY = lat2tile(Math.max(...lats), zoomLevel);
+        const BY = lat2tile(Math.min(...lats), zoomLevel);
+        const LX = long2tile(Math.min(...lngs), zoomLevel);
+        const RX = long2tile(Math.max(...lngs), zoomLevel);
+
+        const tiles = [];
+        for (let y = TY; y <= BY; y++) {
+            for (let x = LX; x <= RX; x++) {
+                const tileRect = getTileRect(x, y, zoomLevel);
+                const tilePolygon = turf.polygon([tileRect]);
+                if (!turf.booleanDisjoint(tilePolygon, polygon)) {
+                    tiles.push({ x, y, z: zoomLevel });
+                }
+            }
+        }
+        return tiles;
+    }
+
+    async function runWithConcurrency(items, limit, task) {
+        let index = 0;
+        async function worker() {
+            while (index < items.length && !generationCancelled) {
+                await task(items[index++]);
+            }
+        }
+        const workers = Array.from({ length: Math.min(limit, items.length) }, worker);
+        await Promise.all(workers);
+    }
+
+    // --- Console UI ---
+
+    function showConsole() {
+        document.getElementById('console-log').innerHTML = '';
+        document.getElementById('console-progress-fill').style.width = '0%';
+        document.getElementById('console-progress-label').textContent = '0 / 0 tiles';
+        document.getElementById('console-status-badge').className = 'console-status-badge';
+        document.getElementById('console-status-badge').textContent = 'Running';
+        const stopBtn = document.getElementById('console-stop-btn');
+        stopBtn.className = 'console-stop-btn';
+        stopBtn.innerHTML = '<i class="fas fa-stop"></i> Stop';
+        stopBtn.onclick = function () {
+            generationCancelled = true;
+            if (pollingTimer) clearTimeout(pollingTimer);
+            logToConsole('Stopping...', 'error');
+            setConsoleStatus('stopped');
+            setConsoleCloseMode();
+        };
+        document.getElementById('console-overlay').classList.add('open');
+    }
+
+    function logToConsole(message, type) {
+        const log = document.getElementById('console-log');
+        const line = document.createElement('p');
+        if (type) line.className = 'log-' + type;
+        line.textContent = '> ' + message;
+        log.appendChild(line);
+        log.scrollTop = log.scrollHeight;
+    }
+
+    function updateConsoleProgress(completed, total) {
+        const pct = total > 0 ? (completed / total) * 100 : 0;
+        document.getElementById('console-progress-fill').style.width = pct + '%';
+        document.getElementById('console-progress-label').textContent = `${completed} / ${total} tiles`;
+    }
+
+    function setConsoleStatus(status) {
+        const badge = document.getElementById('console-status-badge');
+        const labels = { completed: 'Completed', failed: 'Failed', stopped: 'Stopped', 'Generating...': 'Generating...' };
+        badge.className = 'console-status-badge ' + status;
+        badge.textContent = labels[status] || status;
+    }
+
+    function setConsoleCloseMode() {
+        const btn = document.getElementById('console-stop-btn');
+        btn.className = 'console-stop-btn close';
+        btn.innerHTML = '<i class="fas fa-times"></i> Close';
+        btn.onclick = function () {
+            document.getElementById('console-overlay').classList.remove('open');
+        };
     }
 
     // Setup settings panel

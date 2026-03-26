@@ -104,6 +104,44 @@
         </main>
     </div>
 
+    <!-- Name modal -->
+    <div id="name-modal-overlay" class="modal-overlay">
+        <div class="name-modal">
+            <div class="name-modal-header">
+                <i class="fas fa-globe"></i>
+                <h2>Name Your World</h2>
+            </div>
+            <p class="name-modal-hint">Used as the output directory name.</p>
+            <input type="text" id="name-modal-input" class="name-modal-input" placeholder="Generating suggestion...">
+            <div class="name-modal-actions">
+                <button id="name-modal-cancel" class="name-modal-btn name-modal-btn--cancel">Cancel</button>
+                <button id="name-modal-confirm" class="name-modal-btn name-modal-btn--confirm">
+                    <i class="fas fa-play"></i> Generate
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Console modal -->
+    <div id="console-overlay" class="modal-overlay">
+        <div class="console-modal">
+            <div class="console-header">
+                <span class="console-title"><i class="fas fa-terminal"></i> Terrain Generation</span>
+                <span id="console-status-badge" class="console-status-badge">Running</span>
+            </div>
+            <div class="console-progress-wrap">
+                <div id="console-progress-fill" class="console-progress-fill"></div>
+            </div>
+            <div id="console-progress-label" class="console-progress-label">0 / 0 tiles</div>
+            <div id="console-log" class="console-log"></div>
+            <div class="console-footer">
+                <button id="console-stop-btn" class="console-stop-btn">
+                    <i class="fas fa-stop"></i> Stop
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Application JavaScript -->
     <script src="js/main.js"></script>
 </body>

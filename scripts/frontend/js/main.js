@@ -141,6 +141,13 @@
             // Setup settings panel
             setupSettingsPanel();
 
+            // Setup generate button
+            document.getElementById('generate-btn').addEventListener('click', function () {
+                if (validateForGeneration()) {
+                    generateTerrain();
+                }
+            });
+
         });
 
         map.on('error', function (e) {
@@ -585,6 +592,45 @@
         coordinateOverlays = [];
     }
 
+    // Validate inputs before generation
+    function validateForGeneration() {
+        const features = draw.getAll().features;
+
+        if (features.length === 0) {
+            showError('Draw a polygon on the map first.');
+            return false;
+        }
+
+        const polygon = features[0];
+
+        // Check convexity by comparing polygon area to its convex hull area
+        const hull = turf.convex(polygon);
+        if (!hull) {
+            showError('Invalid polygon shape.');
+            return false;
+        }
+        const areaDiff = Math.abs(turf.area(hull) - turf.area(polygon)) / turf.area(polygon);
+        if (areaDiff > 0.001) {
+            showError('Polygon must be convex. Remove inward vertices to fix it.');
+            return false;
+        }
+
+        // Check pivot point is inside the polygon
+        const lngLat = centerMarker.getLngLat();
+        const pivotPoint = turf.point([lngLat.lng, lngLat.lat]);
+        if (!turf.booleanPointInPolygon(pivotPoint, polygon)) {
+            showError('The pivot point (red marker) must be inside the polygon.');
+            return false;
+        }
+
+        return true;
+    }
+
+    // Generate terrain (stub — to be implemented with console UI)
+    function generateTerrain() {
+        showSuccess('Validation passed. Generation coming soon...');
+    }
+
     // Setup settings panel
     function setupSettingsPanel() {
         // Apply loaded/default config to form fields
@@ -796,7 +842,7 @@
             duration: 3000,
             gravity: "top",
             position: "center",
-            style: { background: "linear-gradient(to right, #00b09b, #96c93d)" },
+            style: { background: "linear-gradient(to right, #27ae60, #1e8449)" },
             stopOnFocus: true
         }).showToast();
     }

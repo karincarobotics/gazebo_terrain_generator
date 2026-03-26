@@ -213,6 +213,39 @@ main {
     color: #c0392b;
 }
 
+/* Generate button */
+.generate-btn-container {
+    position: absolute;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+}
+
+.generate-btn {
+    background: #3bb2d0;
+    color: white;
+    border: none;
+    border-radius: 24px;
+    padding: 13px 32px;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    box-shadow: 0 4px 20px rgba(59, 178, 208, 0.5);
+    transition: background 0.2s, box-shadow 0.2s, transform 0.1s;
+    white-space: nowrap;
+}
+
+.generate-btn:hover {
+    background: #2e9dbf;
+    box-shadow: 0 6px 24px rgba(59, 178, 208, 0.65);
+}
+
+.generate-btn:active {
+    transform: translateX(-50%) scale(0.97);
+}
+
 /* Settings panel */
 .settings-panel {
     position: absolute;

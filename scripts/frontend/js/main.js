@@ -224,6 +224,11 @@
             const lat = coords[0];
             const lng = coords[1];
 
+            // Clear any drawn polygon
+            draw.deleteAll();
+            clearCoordinateOverlays();
+            setGridVisible(false);
+
             // Move map to new location
             map.flyTo({
                 center: [lng, lat],
@@ -359,6 +364,13 @@
                 showGrid();
             }
             mouseDownOnVertex = false;
+        });
+
+        map.on('click', function (e) {
+            if (draw.getAll().features.length === 0) {
+                centerMarker.setLngLat(e.lngLat);
+                updateCoordinateInput(e.lngLat.lat, e.lngLat.lng);
+            }
         });
     }
 

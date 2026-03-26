@@ -11,6 +11,9 @@
     let vertexDeletePopup = null;
     let selectedVertex = null; // Store {featureId, coordIndex}
     let mouseDownOnVertex = false;
+    let gridVisible = false;
+    const GRID_ZOOM_LEVEL = 17;
+    const GRID_LAYER_ID = 'grid-preview';
 
     // Initialize the application
     async function init() {
@@ -195,6 +198,7 @@
     // Handle draw create event
     function onDrawCreate(e) {
         console.log('Polygon created:', e.features);
+        setGridVisible(false);
         updateCoordinateOverlays();
     }
 
@@ -267,11 +271,20 @@
             }
         });
 
+        map.on('mousedown', function (e) {
+            if (gridVisible) {
+                hideGrid();
+            }
+        })
+
         map.on('mouseup', function (e) {
             if (selectedVertex) {
                 const feature = draw.get(selectedVertex.featureId);
                 const coords = feature.geometry.coordinates[0][selectedVertex.coordIndex];
                 showVertexDeletePopup({geometry: {coordinates: coords}});
+            }
+            if (gridVisible) {
+                showGrid();
             }
             mouseDownOnVertex = false;
         });
@@ -442,8 +455,21 @@
             updateCoordinateOverlays();
         };
 
+        // Grid preview button
+        const gridButton = document.createElement('button');
+        gridButton.className = 'mapbox-gl-draw_ctrl-draw-btn';
+        gridButton.title = 'Toggle grid preview';
+        gridButton.innerHTML = '<i class="fas fa-th"></i>';
+        gridButton.onclick = function () {
+            setGridVisible(!gridVisible, gridButton);
+        };
+
+        // Expose button so other functions can reset its style
+        window._gridButton = gridButton;
+
         controlContainer.appendChild(drawButton);
         controlContainer.appendChild(coordButton);
+        controlContainer.appendChild(gridButton);
 
         // Add to map
         map.getContainer().querySelector('.mapboxgl-ctrl-top-right').appendChild(controlContainer);
@@ -486,6 +512,122 @@
         coordinateOverlays = [];
     }
 
+    // --- Tile utilities ---
+
+    function long2tile(lon, zoom) {
+        return Math.floor((lon + 180) / 360 * Math.pow(2, zoom));
+    }
+
+    function lat2tile(lat, zoom) {
+        return Math.floor((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, zoom));
+    }
+
+    function tile2long(x, z) {
+        return x / Math.pow(2, z) * 360 - 180;
+    }
+
+    function tile2lat(y, z) {
+        const n = Math.PI - 2 * Math.PI * y / Math.pow(2, z);
+        return 180 / Math.PI * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)));
+    }
+
+    function getTileRect(x, y, zoom) {
+        return [
+            [tile2long(x, zoom), tile2lat(y + 1, zoom)], // SW
+            [tile2long(x + 1, zoom), tile2lat(y + 1, zoom)], // SE
+            [tile2long(x + 1, zoom), tile2lat(y, zoom)],     // NE
+            [tile2long(x, zoom), tile2lat(y, zoom)],     // NW
+            [tile2long(x, zoom), tile2lat(y + 1, zoom)]  // SW close
+        ];
+    }
+
+    function getGrid(zoomLevel) {
+        const features = draw.getAll().features;
+        if (features.length === 0) return [];
+
+        const polygon = features[0];
+        const coords = polygon.geometry.coordinates[0];
+
+        // Get bounding box of polygon
+        const lngs = coords.map(c => c[0]);
+        const lats = coords.map(c => c[1]);
+        const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
+        const minLat = Math.min(...lats), maxLat = Math.max(...lats);
+
+        const TY = lat2tile(maxLat, zoomLevel);
+        const BY = lat2tile(minLat, zoomLevel);
+        const LX = long2tile(minLng, zoomLevel);
+        const RX = long2tile(maxLng, zoomLevel);
+
+        const rects = [];
+        for (let y = TY; y <= BY; y++) {
+            for (let x = LX; x <= RX; x++) {
+                const tileRect = getTileRect(x, y, zoomLevel);
+                const tilePolygon = turf.polygon([tileRect]);
+                if (!turf.booleanDisjoint(tilePolygon, polygon)) {
+                    rects.push(tileRect);
+                }
+            }
+        }
+        return rects;
+    }
+
+    function setGridVisible(visible, button) {
+        gridVisible = visible;
+        const btn = button || window._gridButton;
+        if (btn) btn.style.backgroundColor = gridVisible ? '#3bb2d0' : '';
+        if (gridVisible) {
+            showGrid();
+        } else {
+            hideGrid();
+        }
+    }
+
+    function showGrid() {
+        if (draw.getAll().features.length === 0) {
+            showError('Draw a polygon first before previewing the grid.');
+            setGridVisible(false);
+            return;
+        }
+
+        hideGrid();
+
+        const grid = getGrid(GRID_ZOOM_LEVEL);
+
+        if (grid.length === 0) {
+            showError('No tiles found in selection.');
+            setGridVisible(false);
+            return;
+        }
+
+        const gridFeatures = grid.map(rect => turf.polygon([rect]));
+
+        map.addSource(GRID_LAYER_ID, {
+            type: 'geojson',
+            data: turf.featureCollection(gridFeatures)
+        });
+
+        map.addLayer({
+            id: GRID_LAYER_ID,
+            type: 'line',
+            source: GRID_LAYER_ID,
+            paint: {
+                'line-color': '#ffffff',
+                'line-width': 1,
+                'line-opacity': 0.45
+            }
+        });
+
+        //showInfo(`Grid preview: ${grid.length} tiles at zoom level ${GRID_ZOOM_LEVEL}`);
+    }
+
+    function hideGrid() {
+        if (map.getSource(GRID_LAYER_ID)) {
+            map.removeLayer(GRID_LAYER_ID);
+            map.removeSource(GRID_LAYER_ID);
+        }
+    }
+
     // Show error message
     function showError(message) {
         console.error(message);
@@ -494,7 +636,7 @@
             duration: 5000,
             gravity: "top",
             position: "center",
-            backgroundColor: "linear-gradient(to right, #e74c3c, #c0392b)",
+            style: { background: "linear-gradient(to right, #e74c3c, #c0392b)" },
             stopOnFocus: true
         }).showToast();
     }
@@ -507,7 +649,7 @@
             duration: 3000,
             gravity: "top",
             position: "center",
-            backgroundColor: "linear-gradient(to right, #00b09b, #96c93d)",
+            style: { background: "linear-gradient(to right, #00b09b, #96c93d)" },
             stopOnFocus: true
         }).showToast();
     }
@@ -520,7 +662,7 @@
             duration: 3000,
             gravity: "top",
             position: "center",
-            backgroundColor: "linear-gradient(to right, #3498db, #2980b9)",
+            style: { background: "linear-gradient(to right, #3498db, #2980b9)" },
             stopOnFocus: true
         }).showToast();
     }

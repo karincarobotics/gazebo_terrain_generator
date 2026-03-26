@@ -213,6 +213,273 @@ main {
     color: #c0392b;
 }
 
+/* Settings panel */
+.settings-panel {
+    position: absolute;
+    top: 0;
+    right: -320px;
+    width: 300px;
+    height: 100%;
+    background: #1e2d3d;
+    z-index: 500;
+    transition: right 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow-y: auto;
+    overflow-x: hidden;
+    border-left: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    flex-direction: column;
+}
+
+.settings-panel.open {
+    right: 0;
+}
+
+.settings-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    background: #2c3e50;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    flex-shrink: 0;
+}
+
+.settings-title {
+    color: white;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.settings-close-btn {
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.5);
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 4px;
+    font-size: 13px;
+    transition: color 0.2s, background 0.2s;
+    display: flex;
+    align-items: center;
+}
+
+.settings-close-btn:hover {
+    color: white;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.settings-body {
+    padding: 16px;
+    flex: 1;
+}
+
+.settings-section-title {
+    color: rgba(255, 255, 255, 0.35);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    margin: 24px 0 10px 0;
+}
+
+.settings-field {
+    margin-bottom: 14px;
+}
+
+.settings-field > label {
+    display: block;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 12px;
+    margin-bottom: 6px;
+}
+
+.settings-field input[type="text"],
+.settings-field input[type="number"] {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    color: rgba(255, 255, 255, 0.9);
+    padding: 8px 10px;
+    font-size: 12px;
+    font-family: monospace;
+    outline: none;
+    transition: border-color 0.2s, background 0.2s;
+    box-sizing: border-box;
+}
+
+.settings-field input[type="text"]:focus,
+.settings-field input[type="number"]:focus {
+    border-color: rgba(59, 178, 208, 0.5);
+    background: rgba(255, 255, 255, 0.09);
+}
+
+/* Row field: label + toggle on same line */
+.settings-field--row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.settings-field--row > label {
+    margin-bottom: 0;
+}
+
+/* Toggle switch */
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 40px;
+    height: 22px;
+    flex-shrink: 0;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+    position: absolute;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 22px;
+    transition: background 0.2s;
+}
+
+.toggle-slider::before {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    left: 3px;
+    top: 3px;
+    background: white;
+    border-radius: 50%;
+    transition: transform 0.2s;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+    background: #3bb2d0;
+}
+
+.toggle-switch input:checked + .toggle-slider::before {
+    transform: translateX(18px);
+}
+
+/* Revert to defaults button */
+.settings-revert-btn {
+    width: 100%;
+    margin-top: 8px;
+    padding: 9px;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 12px;
+    cursor: pointer;
+    transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+
+.settings-revert-btn:hover {
+    border-color: rgba(231, 76, 60, 0.5);
+    color: #e74c3c;
+    background: rgba(231, 76, 60, 0.05);
+}
+
+/* Source field row */
+.source-field {
+    display: flex;
+    gap: 6px;
+}
+
+.source-field input {
+    flex: 1;
+    min-width: 0;
+}
+
+.source-display-btn {
+    flex: 1;
+    min-width: 0;
+    text-align: left;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    color: rgba(255, 255, 255, 0.9);
+    padding: 8px 10px;
+    min-height: 34px;
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.source-display-btn:hover {
+    background: rgba(255, 255, 255, 0.09);
+    border-color: rgba(59, 178, 208, 0.4);
+}
+
+.source-field > button {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    color: rgba(255, 255, 255, 0.6);
+    padding: 0 10px;
+    min-height: 34px;
+    cursor: pointer;
+    font-size: 11px;
+    transition: background 0.2s, color 0.2s;
+    flex-shrink: 0;
+}
+
+.source-field > button:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+/* Source presets dropdown */
+.source-presets-dropdown {
+    display: none;
+    background: #263647;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    margin-top: 6px;
+    overflow: hidden;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.source-presets-dropdown.open {
+    display: block;
+}
+
+.source-preset-item {
+    padding: 8px 12px;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+
+.source-preset-item:hover {
+    background: rgba(59, 178, 208, 0.15);
+    color: white;
+}
+
+.source-preset-divider {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.08);
+    margin: 3px 0;
+}
+
 /* Responsive design */
 @media (max-width: 768px) {
     #sidebar {

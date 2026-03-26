@@ -12,8 +12,68 @@
     let selectedVertex = null; // Store {featureId, coordIndex}
     let mouseDownOnVertex = false;
     let gridVisible = false;
-    const GRID_ZOOM_LEVEL = 17;
     const GRID_LAYER_ID = 'grid-preview';
+    const STORAGE_KEY = 'gazebo_terrain_generator_settings';
+
+    const DEFAULT_CONFIG = {
+        zoomLevel: 17,
+        includeBuildings: true,
+        tileSource: 'http://ecn.t0.tiles.virtualearth.net/tiles/a{quad}.jpeg?g=129&mkt=en&stl=H',
+        parallelDownloads: 4
+    };
+
+    const config = loadConfig();
+
+    const TILE_SOURCES = [
+        { label: 'Bing Maps', url: 'http://ecn.t0.tiles.virtualearth.net/tiles/r{quad}.jpeg?g=129&mkt=en&stl=H' },
+        { label: 'Bing Maps Satellite', url: 'http://ecn.t0.tiles.virtualearth.net/tiles/a{quad}.jpeg?g=129&mkt=en&stl=H' },
+        { label: 'Bing Maps Hybrid', url: 'http://ecn.t0.tiles.virtualearth.net/tiles/h{quad}.jpeg?g=129&mkt=en&stl=H' },
+        null,
+        { label: 'Google Maps', url: 'https://mt0.google.com/vt?lyrs=m&x={x}&s=&y={y}&z={z}' },
+        { label: 'Google Maps Satellite', url: 'https://mt0.google.com/vt?lyrs=s&x={x}&s=&y={y}&z={z}' },
+        { label: 'Google Maps Hybrid', url: 'https://mt0.google.com/vt?lyrs=h&x={x}&s=&y={y}&z={z}' },
+        { label: 'Google Maps Terrain', url: 'https://mt0.google.com/vt?lyrs=p&x={x}&s=&y={y}&z={z}' },
+        null,
+        { label: 'Open Street Maps', url: 'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png' },
+        { label: 'Open Cycle Maps', url: 'http://a.tile.opencyclemap.org/cycle/{z}/{x}/{y}.png' },
+        null,
+        { label: 'ESRI World Imagery', url: 'http://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' },
+        { label: 'Wikimedia Maps', url: 'https://maps.wikimedia.org/osm-intl/{z}/{x}/{y}.png' },
+        null,
+        { label: 'Carto Light', url: 'http://cartodb-basemaps-c.global.ssl.fastly.net/light_all/{z}/{x}/{y}.png' },
+        { label: 'Stamen Toner B&W', url: 'http://a.tile.stamen.com/toner/{z}/{x}/{y}.png' },
+    ];
+
+    function loadConfig() {
+        try {
+            const stored = localStorage.getItem(STORAGE_KEY);
+            if (stored) {
+                return Object.assign({}, DEFAULT_CONFIG, JSON.parse(stored));
+            }
+        } catch (e) {
+            console.warn('Failed to load settings from localStorage:', e);
+        }
+        return Object.assign({}, DEFAULT_CONFIG);
+    }
+
+    function saveConfig() {
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+        } catch (e) {
+            console.warn('Failed to save settings to localStorage:', e);
+        }
+    }
+
+    function applyConfigToForm() {
+        document.getElementById('setting-zoom-level').value = config.zoomLevel;
+        document.getElementById('setting-include-buildings').checked = config.includeBuildings;
+        document.getElementById('setting-tile-source').value = config.tileSource;
+        document.getElementById('setting-parallel-downloads').value = config.parallelDownloads;
+
+        const matchedSource = TILE_SOURCES.find(s => s && s.url === config.tileSource);
+        document.getElementById('setting-source-display').textContent =
+            matchedSource ? matchedSource.label : 'Custom';
+    }
 
     // Initialize the application
     async function init() {
@@ -77,6 +137,9 @@
 
             // Setup draw controls
             setupDrawControls();
+
+            // Setup settings panel
+            setupSettingsPanel();
 
         });
 
@@ -467,9 +530,19 @@
         // Expose button so other functions can reset its style
         window._gridButton = gridButton;
 
+        // Settings button
+        const settingsButton = document.createElement('button');
+        settingsButton.className = 'mapbox-gl-draw_ctrl-draw-btn';
+        settingsButton.title = 'Settings';
+        settingsButton.innerHTML = '<i class="fas fa-cog"></i>';
+        settingsButton.onclick = function () {
+            document.getElementById('settings-panel').classList.toggle('open');
+        };
+
         controlContainer.appendChild(drawButton);
         controlContainer.appendChild(coordButton);
         controlContainer.appendChild(gridButton);
+        controlContainer.appendChild(settingsButton);
 
         // Add to map
         map.getContainer().querySelector('.mapboxgl-ctrl-top-right').appendChild(controlContainer);
@@ -510,6 +583,80 @@
             popup.remove();
         });
         coordinateOverlays = [];
+    }
+
+    // Setup settings panel
+    function setupSettingsPanel() {
+        // Apply loaded/default config to form fields
+        applyConfigToForm();
+
+        // Populate source presets dropdown
+        const presetsDropdown = document.getElementById('source-presets-dropdown');
+        TILE_SOURCES.forEach(function (source) {
+            if (source === null) {
+                const divider = document.createElement('div');
+                divider.className = 'source-preset-divider';
+                presetsDropdown.appendChild(divider);
+            } else {
+                const item = document.createElement('div');
+                item.className = 'source-preset-item';
+                item.textContent = source.label;
+                item.addEventListener('click', function () {
+                    document.getElementById('setting-tile-source').value = source.url;
+                    document.getElementById('setting-source-display').textContent = source.label;
+                    config.tileSource = source.url;
+                    presetsDropdown.classList.remove('open');
+                    saveConfig();
+                });
+                presetsDropdown.appendChild(item);
+            }
+        });
+
+        // Toggle presets dropdown via display button or chevron
+        function togglePresetsDropdown(e) {
+            e.stopPropagation();
+            presetsDropdown.classList.toggle('open');
+        }
+        document.getElementById('setting-source-display').addEventListener('click', togglePresetsDropdown);
+        document.getElementById('setting-source-presets-btn').addEventListener('click', togglePresetsDropdown);
+
+        // Close presets dropdown on outside click
+        document.addEventListener('click', function (e) {
+            if (!e.target.closest('#setting-source-display') &&
+                !e.target.closest('#setting-source-presets-btn') &&
+                !e.target.closest('#source-presets-dropdown')) {
+                presetsDropdown.classList.remove('open');
+            }
+        });
+
+        // Close panel button
+        document.getElementById('settings-close-btn').addEventListener('click', function () {
+            document.getElementById('settings-panel').classList.remove('open');
+        });
+
+        // Sync config on input change
+        document.getElementById('setting-zoom-level').addEventListener('change', function () {
+            config.zoomLevel = parseInt(this.value, 10) || 17;
+            saveConfig();
+            if (gridVisible) { showGrid(); }
+        });
+
+        document.getElementById('setting-include-buildings').addEventListener('change', function () {
+            config.includeBuildings = this.checked;
+            saveConfig();
+        });
+
+        document.getElementById('setting-parallel-downloads').addEventListener('change', function () {
+            config.parallelDownloads = parseInt(this.value, 10) || 4;
+            saveConfig();
+        });
+
+        document.getElementById('settings-revert-btn').addEventListener('click', function () {
+            Object.assign(config, DEFAULT_CONFIG);
+            localStorage.removeItem(STORAGE_KEY);
+            applyConfigToForm();
+            if (gridVisible) { showGrid(); }
+        });
     }
 
     // --- Tile utilities ---
@@ -592,7 +739,7 @@
 
         hideGrid();
 
-        const grid = getGrid(GRID_ZOOM_LEVEL);
+        const grid = getGrid(config.zoomLevel);
 
         if (grid.length === 0) {
             showError('No tiles found in selection.');

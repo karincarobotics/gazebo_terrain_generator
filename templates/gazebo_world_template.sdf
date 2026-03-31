@@ -89,14 +89,42 @@
             <elevation>$ORIGIN_ELEVATION$</elevation>
         </spherical_coordinates>
 
-        <!-- Environment model -->
-        <include>
-            <uri>model://$MODELNAME$</uri>
-        </include>
+        <!-- Terrain model — inlined, no model:// URI required -->
+        <model name="$MODELNAME$">
+            <static>true</static>
+            <pose>$POSX$ $POSY$ $POSZ$ 0 0 0</pose>
 
-        <include>
-            <uri>$HELIPAD$</uri>
-        </include>
+            <link name="ground">
+                <collision name="collision">
+                    <geometry>
+                        <heightmap>
+                            <uri>terrain_data/height_map.tif</uri>
+                            <size>$SIZEX$ $SIZEY$ $SIZEZ$</size>
+                            <pos>0 0 0</pos>
+                        </heightmap>
+                    </geometry>
+                </collision>
+                <visual name="ground_visual">
+                    <geometry>
+                        <heightmap>
+                            <use_terrain_paging>false</use_terrain_paging>
+                            <texture>
+                                <diffuse>terrain_data/aerial.png</diffuse>
+                                <normal>terrain_data/aerial.png</normal>
+                                <size>$SIZEX$ $SIZEY$ $SIZEZ$</size>
+                            </texture>
+                            <uri>terrain_data/height_map.tif</uri>
+                            <size>$SIZEX$ $SIZEY$ $SIZEZ$</size>
+                            <pos>0 0 0</pos>
+                            <sampling>2</sampling>
+                        </heightmap>
+                    </geometry>
+                </visual>
+            </link>
+
+$BUILDING$
+
+        </model>
 
 
     </world>

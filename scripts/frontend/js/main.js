@@ -722,18 +722,11 @@
         const includeBuildings = config.includeBuildings;
         const parallelDownloads = config.parallelDownloads;
 
-        // Compute bounds and pivot
+        // Get polygon vertices — bounds/center computed server-side
         const polygon = draw.getAll().features[0];
         const coords = polygon.geometry.coordinates[0];
-        const lngs = coords.map(c => c[0]);
-        const lats = coords.map(c => c[1]);
-        const west = Math.min(...lngs), east = Math.max(...lngs);
-        const south = Math.min(...lats), north = Math.max(...lats);
-        const bounds = [west, south, east, north];
-        const center = [(west + east) / 2, (south + north) / 2];
         const lngLat = centerMarker.getLngLat();
         const launchLocation = [lngLat.lng, lngLat.lat];
-        const area = turf.area(polygon);
 
         const tiles = getTiles(zoomLevel);
 
@@ -748,10 +741,8 @@
             startData.append('mapName', modelName);
             startData.append('outputFile', outputFile);
             startData.append('timestamp', timestamp);
-            startData.append('bounds', bounds.join(','));
-            startData.append('center', center.join(','));
+            startData.append('polygonVertices', JSON.stringify(coords));
             startData.append('launchLocation', launchLocation.join(','));
-            startData.append('area', area);
             startData.append('includeBuildings', includeBuildings);
             startData.append('source', source);
             const startResp = await fetch('/start-download', { method: 'POST', body: startData });
@@ -794,11 +785,9 @@
 
         try {
             const endData = new FormData();
-            endData.append('maxZoom', zoomLevel);
             endData.append('mapName', modelName);
-            endData.append('outputFile', outputFile);
-            endData.append('timestamp', timestamp);
-            endData.append('bounds', bounds.join(','));
+            endData.append('maxZoom', zoomLevel);
+            endData.append('polygonVertices', JSON.stringify(coords));
             endData.append('includeBuildings', includeBuildings);
             const endResp = await fetch('/end-download', { method: 'POST', body: endData });
             const endResult = await endResp.json();

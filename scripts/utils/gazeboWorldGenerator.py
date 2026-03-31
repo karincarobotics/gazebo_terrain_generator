@@ -2,6 +2,8 @@ import os
 import cv2
 import shutil
 import json
+import numpy as np
+import argparse
 from utils.fileWriter import FileWriter
 from utils.param import globalParam
 from utils.maptileUtils import maptile_utiles
@@ -11,7 +13,6 @@ from utils.utils import ConcatImage
 from geopy.distance import geodesic
 from geopy.distance import distance
 from geopy.point import Point
-from multiprocessing import Pool, cpu_count
 from PIL import Image
 import rasterio
 
@@ -21,50 +22,64 @@ class OrthoGenerator(ConcatImage):
         super().__init__(**kwargs)
 
 
-    def generate_ortho(self,path: str,zoomlevel,model_name,boundaries)-> None:
+    def generate_ortho(self, tile_path: str, zoom_level: int) -> None:
         """
-        Generate the aerial image of the map.
+        Generate the aerial image of the map by stitching flat tile files.
+        The selection may be a polygon, so some tiles in the bounding rectangle
+        may be missing — those are filled with a gray placeholder.
 
         Args:
-            path (str): Path to metadata.
+            tile_path (str): Path to the map directory (contains tiles/ and terrain_data/).
+            zoom_level (int): Zoom level used when downloading tiles.
 
         Returns:
             None
         """
- 
-        image_dir = os.path.join(path, str(zoomlevel))
-        # Check and create necessary directories
-        maptile_utiles.dir_check(os.path.join(globalParam.GAZEBO_MODEL_PATH, model_name, 'textures'),remove_existing=True)
-        maptile_utiles.dir_check(os.path.join(globalParam.TEMPORARY_SATELLITE_IMAGE, model_name),remove_existing=True)
-        bound_array = boundaries.split(',')
-        tile_boundaries = maptile_utiles.get_max_tilenumber(bound_array,zoomlevel)
-        image_dir_list = self.get_x_tile_directories(image_dir,tile_boundaries)
+        tiles_dir = os.path.join(tile_path, 'tiles')
+        output_dir = os.path.join(tile_path, 'terrain_data')
+        os.makedirs(output_dir, exist_ok=True)
 
+        # Parse flat tile filenames: [zoom,y,x].png → build lookup dict
+        tile_map = {}  # (x, y) → path
+        for fname in os.listdir(tiles_dir):
+            if not fname.endswith('.png'):
+                continue
+            parts = fname[1:-5].split(',')  # strip '[' and '].png'
+            z, y, x = int(parts[0]), int(parts[1]), int(parts[2])
+            if z != zoom_level:
+                continue
+            tile_map[(x, y)] = os.path.join(tiles_dir, fname)
 
-        temp_output_dir = os.path.join(globalParam.TEMPORARY_SATELLITE_IMAGE, model_name)
-        args_list = [
-            (self, dir_name, image_dir, tile_boundaries, temp_output_dir)
-            for dir_name in image_dir_list
-        ]
-        #  Multiprocessing call
-        with Pool(processes=cpu_count()) as pool:
-            pool.map(OrthoGenerator._run_instance_method, args_list)
+        if not tile_map:
+            raise ValueError(f"No tiles found in {tiles_dir} for zoom level {zoom_level}")
 
-        image_list = sorted([
-            os.path.join(temp_output_dir, img)
-            for img in os.listdir(temp_output_dir) if img.endswith('.png')
-        ])            
-        images = [cv2.imread(path) for path in image_list]
-        filtered_images = [images[0]]
+        x_min = min(x for x, y in tile_map)
+        x_max = max(x for x, y in tile_map)
+        y_min = min(y for x, y in tile_map)
+        y_max = max(y for x, y in tile_map)
 
-        for img in images[1:]:
-            if OrthoGenerator.are_dimensions_equal(filtered_images[-1], img):
-                filtered_images.append(img)
-        stitched_image = cv2.hconcat(filtered_images)
+        # Get tile size from the first available tile, create gray fill for missing tiles
+        sample_img = cv2.imread(next(iter(tile_map.values())))
+        tile_h, tile_w = sample_img.shape[:2]
+        gray_tile = np.full((tile_h, tile_w, 3), 128, dtype=np.uint8)
+
+        # Build full bounding rectangle west→east, north→south; fill gaps with gray
+        column_images = []
+        for x in range(x_min, x_max + 1):
+            rows = []
+            for y in range(y_min, y_max + 1):
+                if (x, y) in tile_map:
+                    img = cv2.imread(tile_map[(x, y)])
+                    rows.append(img if img is not None else gray_tile)
+                else:
+                    rows.append(gray_tile)
+            column_images.append(cv2.vconcat(rows))
+
+        stitched_image = cv2.hconcat(column_images)
 
         # Save the stitched image
         compression_params = [cv2.IMWRITE_PNG_COMPRESSION, 9]
-        cv2.imwrite(os.path.join(globalParam.GAZEBO_MODEL_PATH, model_name, 'textures', model_name+'_aerial.png'), stitched_image, compression_params)
+        cv2.imwrite(os.path.join(output_dir, 'aerial.png'), stitched_image, compression_params)
 
 
 
@@ -78,6 +93,7 @@ class GazeboTerrianGenerator(HeightmapGenerator,OrthoGenerator):
             self.boundaries = data["bounds"]
             self.launch_location = data["launch_location"]
             self.zoom_level = data["zoom_level"]
+            self.dem_resolution = data["dem_resolution"]
         self.model_name = os.path.basename(self.tile_path)
 
 
@@ -117,7 +133,7 @@ class GazeboTerrianGenerator(HeightmapGenerator,OrthoGenerator):
         return {
             "latitude": origin_lat,
             "longitude": origin_lon,
-            "altitude": HeightmapGenerator.get_amsl(origin_lat, origin_lon)
+            "altitude": HeightmapGenerator.get_amsl(origin_lat, origin_lon, os.path.join(self.tile_path, 'dem'), self.dem_resolution)
         }
 
     def get_launch_location(self) -> list:
@@ -132,57 +148,37 @@ class GazeboTerrianGenerator(HeightmapGenerator,OrthoGenerator):
         return {
             "latitude": float(location_array[1]),
             "longitude": float(location_array[0]),
-            "altitude": HeightmapGenerator.get_amsl(float(location_array[1]), float(location_array[0]))
+            "altitude": HeightmapGenerator.get_amsl(float(location_array[1]), float(location_array[0]), os.path.join(self.tile_path, 'dem'), self.dem_resolution)
             }
 
-    def gen_sdf(self, size_x: float, size_y: float, size_z: float, pose_x: float, pose_y: float, pose_z: float, include_buildings : bool) -> None:
+    def gen_world(self, size_x: float, size_y: float, size_z: float, pose_x: float, pose_y: float, pose_z: float) -> None:
         """
-        Generate the SDF file for the world.
+        Generate the Gazebo world file with the terrain model inlined.
 
         Args:
-            metadata_path (str): Path to metadata.
-            size_x (float): Size in x-direction.
-            size_y (float): Size in y-direction.
-            size_z (float): Size in z-direction.
-            pose_x (float): Pose in x-direction.
-            pose_y (float): Pose in y-direction.
-            pose_z (float): Pose in z-direction.
+            size_x (float): Terrain size in x-direction (meters).
+            size_y (float): Terrain size in y-direction (meters).
+            size_z (float): Terrain size in z-direction (meters).
+            pose_x (float): Model pose offset in x (meters).
+            pose_y (float): Model pose offset in y (meters).
+            pose_z (float): Model pose offset in z (meters).
 
         Returns:
             None
         """
-
-        template = FileWriter.read_template(os.path.join(globalParam.TEMPLATE_DIR_PATH ,'sdf_temp.txt'))
-        FileWriter.write_sdf_file(template, self.model_name, size_x, size_y, size_z,pose_x,pose_y,pose_z, os.path.join(globalParam.GAZEBO_MODEL_PATH, self.model_name),include_buildings)
-
-    def gen_config(self) -> None:
-        """
-        Generate the configuration file for the model.
-
-        Args:
-            metadata_path (str): Path to metadata.
-
-        Returns:
-            None
-        """
-        template = FileWriter.read_template(os.path.join(globalParam.TEMPLATE_DIR_PATH ,'config_temp.txt'))
-        FileWriter.write_config_file(template, self.model_name, os.path.join(globalParam.GAZEBO_MODEL_PATH, self.model_name))
-    
-    def gen_world(self) -> None:
-        """
-        Generate the gazebo world file.
-
-        Args:
-
-        Returns:
-            None
-        """
-
-        template = FileWriter.read_template(os.path.join(globalParam.TEMPLATE_DIR_PATH ,'gazebo_world_template.sdf'))
+        template = FileWriter.read_template(os.path.join(globalParam.TEMPLATE_DIR_PATH, 'gazebo_world_template.sdf'))
         launch_cord = self.get_launch_location()
-        helipad_exist = os.path.exists(os.path.join(globalParam.GAZEBO_MODEL_PATH, 'helipad'))
-        world_directory = os.path.join(globalParam.GAZEBO_WORLD_PATH, self.model_name+"_world")
-        FileWriter.write_world_file(template, self.model_name,launch_cord["latitude"],launch_cord["longitude"],world_directory,launch_cord["altitude"],helipad_exist)
+        FileWriter.write_world_file(
+            template,
+            self.model_name,
+            size_x, size_y, size_z,
+            pose_x, pose_y, pose_z,
+            launch_cord["latitude"],
+            launch_cord["longitude"],
+            launch_cord["altitude"],
+            self.include_buildings,
+            self.tile_path,
+        )
 
     def get_launch_pixelcord(self, south_west_bound, north_east_bound, width, height, launch_location):
         """
@@ -289,28 +285,20 @@ class GazeboTerrianGenerator(HeightmapGenerator,OrthoGenerator):
             Generate the gazebo world along with world files.
         """
 
-        print("Map tiles directory being used : ",self.tile_path)
+        print("Map tiles directory being used : ", self.tile_path)
         if os.path.isfile(os.path.join(self.tile_path, 'metadata.json')) and self.tile_path != '':
-            self.generate_ortho(self.tile_path,self.zoom_level,self.model_name,self.boundaries)
+            self.generate_ortho(self.tile_path, self.zoom_level)
             print("Satellite image generated successfully")
-            self.generate_rgb_heightmap(self.tile_path,self.boundaries,self.zoom_level)
-            (size_x,size_y,size_z,pose_x,posey,posez) = self.get_world_dimensions()
+            self.generate_rgb_heightmap(self.tile_path, self.boundaries, self.zoom_level, os.path.join(self.tile_path, 'dem'), self.dem_resolution)
+            (size_x, size_y, size_z, pose_x, pose_y, pose_z) = self.get_world_dimensions()
             if self.include_buildings:
                 origin_coord = self.get_true_origin()
-                print("Starting building data download...")
-                street_map = os.path.join(globalParam.GAZEBO_MODEL_PATH, self.model_name, 'buildings.geojson')
-                output_dae_file = os.path.join(globalParam.GAZEBO_MODEL_PATH, self.model_name, 'textures/buildings.dae')
+                terrain_data_dir = os.path.join(self.tile_path, 'terrain_data')
+                street_map = os.path.join(terrain_data_dir, 'buildings.geojson')
+                output_dae_file = os.path.join(terrain_data_dir, 'buildings.dae')
                 true_boundaries = maptile_utiles.get_true_boundaries(self.boundaries.split(','), self.zoom_level)
                 geojson_to_dae = GeoJSONToDAE(street_map, output_dae_file)
-                geojson_to_dae.run(origin_coord,size_z,posez,self.heightmap, true_boundaries)
+                geojson_to_dae.run(origin_coord, size_z, pose_z, self.heightmap, true_boundaries)
                 print("Building models generated successfully")
-            # Generate SDF files for the world
-            self.gen_config()
-            self.gen_sdf(size_x,size_y,size_z,pose_x,posey,posez,self.include_buildings)
-            maptile_utiles.dir_check(globalParam.GAZEBO_WORLD_PATH)
-            self.gen_world()
-            print("Generate gazebo model files are save to : ",os.path.join(globalParam.GAZEBO_MODEL_PATH,os.path.basename(self.tile_path)))
-            print("Generate gazebo world file are save to : ",globalParam.GAZEBO_WORLD_PATH)
-            print("Gazebo world files generated successfully")
-
-            shutil.rmtree(globalParam.TEMP_PATH)
+            self.gen_world(size_x, size_y, size_z, pose_x, pose_y, pose_z)
+            print("Gazebo world file saved to:", os.path.join(self.tile_path, self.model_name + ".world"))

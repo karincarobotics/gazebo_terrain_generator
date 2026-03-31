@@ -659,7 +659,7 @@ $(function() {
 		var boundsArray = [[bounds.getSouthWest().lng,bounds.getSouthWest().lat],[bounds.getNorthEast().lng,bounds.getNorthEast().lat]];
 		var centerArray = [bounds.getCenter().lng,bounds.getCenter().lat];
 		var launchLocation = window.launchLocation ? window.launchLocation : centerArray;
-		var includeBuildlings = $("#buildings-toggle").is(":checked");
+		var includeBuildings = $("#buildings-toggle").is(":checked");
 		var data = new FormData();
 		data.append('maxZoom', getMaxZoom());
 		data.append('outputDirectory', outputDirectory);
@@ -672,7 +672,7 @@ $(function() {
 		data.append('center', centerArray.join(","));
 		data.append('launchLocation', launchLocation.join(","));
 		data.append('area', area_rect);
-		data.append('includeBuildlings', includeBuildlings);
+		data.append('includeBuildings', includeBuildings);
 
 		var request = await $.ajax({
 			url: "/start-download",
@@ -711,7 +711,7 @@ $(function() {
 				data.append('center', centerArray.join(","))
 				data.append('launchLocation', launchLocation.join(","))
 				data.append('area', area_rect)
-				data.append('includeBuildlings', includeBuildlings)
+				data.append('includeBuildings', includeBuildings)
 
 				var request = $.ajax({
 					"url": url,

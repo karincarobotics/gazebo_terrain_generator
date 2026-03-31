@@ -37,50 +37,6 @@ class FileWriter:
 
 		return directory
 
-	@staticmethod
-	def addMetadata(lock, path, file, name, description, format, bounds, center, area, zoom_level, profile="mercator", tileSize=256, launchLocation=None):
-		'''
-        Add metadata to the specified path as a JSON file.
-
-        Args:
-            lock (multiprocessing.Lock): A lock for thread-safe operations.
-            path (str): The directory path to ensure.
-            file (str): The file name to store metadata.
-            name (str): The name metadata.
-            description (str): The description metadata.
-            format (str): The format metadata.
-            bounds (list): The bounds metadata as a list of float values.
-            center (list): The center metadata as a list of float values.
-            area (str): The area metadata.
-            zoom_level (int): The zoom_level metadata.
-            profile (str, optional): The profile metadata. Defaults to "mercator".
-            tileSize (int, optional): The tileSize metadata. Defaults to 256.
-
-        Returns:
-            None
-		'''
-		FileWriter.ensureDirectory(lock, path)
-
-		data = [
-			("name", name),
-			("description", description),
-			("format", format), 
-			("bounds", ','.join(map(str, bounds))), 
-			("center", ','.join(map(str, center))), 
-			("zoom_level", zoom_level), 
-			("profile", profile), 
-			("tilesize", str(tileSize)), 
-			("area",area),
-			("scheme", "xyz"), 
-			("generator", "EliteMapper by Visor Dynamics"),
-			("type", "overlay"),
-			("attribution", "EliteMapper by Visor Dynamics"),
-			("launch_location", ','.join(map(str, launchLocation)))
-		]
-		with open(path + "/metadata.json", 'w+') as jsonFile:
-			json.dump(dict(data), jsonFile)
-
-		return
 
 	@staticmethod
 	def addTile(lock, filePath, sourcePath, x, y, z, outputScale):
@@ -303,8 +259,9 @@ class FileWriter:
     	
 		# Ensure results are a string
 		sdf_content = str(sdf_template)
-		target = open(os.path.join(path,model_name+".sdf"), "w")
+		os.makedirs(path, exist_ok=True) # make sure the directory exists
+		target = open(os.path.join(path,model_name+".world"), "w")
 
-    	# Write to model.sdf
+    	# Write to model.world
 		target.write(sdf_content)
 		target.close()

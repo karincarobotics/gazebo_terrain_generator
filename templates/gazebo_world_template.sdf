@@ -1,0 +1,103 @@
+<?xml version="1.0" ?>
+<sdf version="1.9">
+    <world name="$MODELNAME$">
+
+        <!-- Plugin for simulating physics -->
+        <plugin
+                filename="gz-sim-physics-system"
+                name="gz::sim::systems::Physics">
+        </plugin>
+
+        <!-- Plugin for handling user commands -->
+        <plugin
+                filename="gz-sim-user-commands-system"
+                name="gz::sim::systems::UserCommands">
+        </plugin>
+
+        <!-- Plugin for broadcasting scene updates -->
+        <plugin
+                filename="gz-sim-scene-broadcaster-system"
+                name="gz::sim::systems::SceneBroadcaster">
+        </plugin>
+
+        <!-- Plugin for handling sensors like the LIDAR -->
+        <plugin
+                filename="gz-sim-sensors-system"
+                name="gz::sim::systems::Sensors">
+            <render_engine>ogre2</render_engine>
+        </plugin>
+
+        <!-- Plugin for IMU -->
+        <plugin filename="gz-sim-imu-system"
+                name="gz::sim::systems::Imu">
+        </plugin>
+
+        <!-- plugin for GPS  -->
+        <plugin
+                filename="ignition-gazebo-navsat-system"
+                name="ignition::gazebo::systems::NavSat">
+        </plugin>
+
+        <light type="directional" name="sun">
+            <cast_shadows>true</cast_shadows>
+            <pose>0 0 10 0 0 0</pose>
+            <diffuse>0.8 0.8 0.8 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <attenuation>
+                <range>1000</range>
+                <constant>0.9</constant>
+                <linear>0.01</linear>
+                <quadratic>0.001</quadratic>
+            </attenuation>
+            <direction>-0.5 0.1 -0.9</direction>
+        </light>
+
+        <!-- VTODO: Uncomment later, it might create an artifact-->
+<!--        <scene>-->
+<!--            <grid>0</grid>-->
+<!--            <origin_visual>0</origin_visual>-->
+<!--        </scene>-->
+
+        <!-- Polymath standard physics simulation engine config,
+        ODE does not behave correctly with heightmaps, we'll use bullet instead -->
+        <!--        <physics type='ode'>-->
+        <!--            <max_step_size>0.005</max_step_size>-->
+        <!--            <real_time_factor>1</real_time_factor>-->
+        <!--            <real_time_update_rate>200</real_time_update_rate>-->
+        <!--        </physics>-->
+        <physics name="1ms" type="ignored">
+            <dart>
+                <!-- Heightmaps behave better with the bullet collision detector -->
+                <collision_detector>bullet</collision_detector>
+            </dart>
+        </physics>
+        <gravity>0 0 -9.8066</gravity>
+
+        <gui fullscreen='0'>
+            <!--VTODO: set camera position accordingly, maybe relative to helipad-->
+            <camera name='user_camera'>
+                <pose>0.0 0.0 0.0 0 0.53 -0.79</pose>
+                <view_controller>orbit</view_controller>
+                <projection_type>perspective</projection_type>
+            </camera>
+        </gui>
+
+        <spherical_coordinates>
+            <surface_model>EARTH_WGS84</surface_model>
+            <latitude_deg>$ORIGIN_LAT$</latitude_deg>
+            <longitude_deg>$ORIGIN_LONG$</longitude_deg>
+            <elevation>$ORIGIN_ELEVATION$</elevation>
+        </spherical_coordinates>
+
+        <!-- Environment model -->
+        <include>
+            <uri>model://$MODELNAME$</uri>
+        </include>
+
+        <include>
+            <uri>$HELIPAD$</uri>
+        </include>
+
+
+    </world>
+</sdf>

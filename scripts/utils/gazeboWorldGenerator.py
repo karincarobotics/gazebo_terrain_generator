@@ -178,11 +178,11 @@ class GazeboTerrianGenerator(HeightmapGenerator,OrthoGenerator):
             None
         """
 
-        template = FileWriter.read_template(os.path.join(globalParam.TEMPLATE_DIR_PATH ,'gazebo_world.txt'))
+        template = FileWriter.read_template(os.path.join(globalParam.TEMPLATE_DIR_PATH ,'gazebo_world_template.sdf'))
         launch_cord = self.get_launch_location()
         helipad_exist = os.path.exists(os.path.join(globalParam.GAZEBO_MODEL_PATH, 'helipad'))
-        FileWriter.write_world_file(template, self.model_name,launch_cord["latitude"],launch_cord["longitude"],os.path.join(globalParam.GAZEBO_MODEL_PATH, self.model_name),launch_cord["altitude"],helipad_exist)
-        FileWriter.write_world_file(template, self.model_name,launch_cord["latitude"],launch_cord["longitude"],globalParam.GAZEBO_WORLD_PATH,launch_cord["altitude"],helipad_exist)
+        world_directory = os.path.join(globalParam.GAZEBO_WORLD_PATH, self.model_name+"_world")
+        FileWriter.write_world_file(template, self.model_name,launch_cord["latitude"],launch_cord["longitude"],world_directory,launch_cord["altitude"],helipad_exist)
 
     def get_launch_pixelcord(self, south_west_bound, north_east_bound, width, height, launch_location):
         """

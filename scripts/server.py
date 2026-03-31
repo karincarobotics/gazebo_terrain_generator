@@ -4,7 +4,9 @@ from flask import Flask, request, jsonify, send_from_directory
 import threading
 import os
 import uuid
-import base64
+import json
+import shutil
+import tempfile
 from pathlib import Path
 import mimetypes
 from utils.demTilesDownloader import download_dem_data
@@ -26,18 +28,20 @@ task_status = {"status": "idle"}  # Global variable to track task status
 outputdirectory = None
 
 def random_string():
-
 	return uuid.uuid4().hex.upper()[0:6]
 
-def process_end_download(bounds, zoom_level, outputDirectory, outputFile, filePath, include_buildings=False):
+def get_map_dir(map_name):
+	return os.path.join(tempfile.gettempdir(), 'gazebo_terrain_generator', map_name)
+
+def process_end_download(bounds, zoom_level, map_name, outputFile, filePath, include_buildings=False):
 	global task_status
 	try:
 		task_status["status"] = "in_progress"
 		#Perform the long-running task
-		FileWriter.close(lock, os.path.join(globalParam.OUTPUT_BASE_PATH, outputDirectory), filePath, zoom_level)
+		FileWriter.close(lock, os.path.join(globalParam.OUTPUT_BASE_PATH, map_name), filePath, zoom_level)
 		true_boundaries = maptile_utiles.get_true_boundaries(bounds, zoom_level)
 		download_dem_data(true_boundaries, globalParam.DEM_PATH)
-		orthodir_path = os.path.join(globalParam.OUTPUT_BASE_PATH, outputDirectory)
+		orthodir_path = os.path.join(globalParam.OUTPUT_BASE_PATH, map_name)
 		model_path =  os.path.join(globalParam.GAZEBO_MODEL_PATH,os.path.basename(orthodir_path))
 		if include_buildings:
 			print("Starting building data download...")
@@ -97,91 +101,74 @@ def download_tile():
 	x = int(postvars['x'])
 	y = int(postvars['y'])
 	z = int(postvars['z'])
-	quad = str(postvars['quad'])
-	timestamp = int(postvars['timestamp'])
-	outputDirectory = str(postvars['outputDirectory'])
-	outputFile = str(postvars['outputFile'])
-	outputScale = 1
+	map_name = str(postvars['mapName'])
 	source = str(postvars['source'])
 
-	replaceMap = {
-		"x": str(x),
-		"y": str(y),
-		"z": str(z),
-		"quad": quad,
-		"timestamp": str(timestamp),
-	}
-	for key, value in replaceMap.items():
-		outputDirectory = outputDirectory.replace(f"{{{key}}}", value)
-		outputFile = outputFile.replace(f"{{{key}}}", value)
+	file_path = os.path.join(get_map_dir(map_name), 'tiles', f"[{z},{y},{x}].png")
 
-	filePath = os.path.join(globalParam.OUTPUT_BASE_PATH, outputDirectory, outputFile)
+	if os.path.isfile(file_path):
+		return jsonify({"code": 200, "message": "Tile already exists"})
 
-	result = {}
-	if FileWriter.exists(filePath, x, y, z):
-		result["code"] = 200
-		result["message"] = 'Tile already exists'
+	os.makedirs(os.path.dirname(file_path), exist_ok=True)
+	code = Utils.downloadFile(source, file_path, x, y, z)
+
+	if code == 200:
+		return jsonify({"code": 200, "message": "Tile downloaded"})
 	else:
-		tempFile = random_string() + ".jpg"
-		tempFilePath = os.path.join(globalParam.TEMP_PATH, tempFile)
-		result["code"] = Utils.downloadFileScaled(source, tempFilePath, x, y, z, outputScale)
-
-		if os.path.isfile(tempFilePath):
-			FileWriter.addTile(lock, filePath, tempFilePath, x, y, z, outputScale)
-			with open(tempFilePath, "rb") as image_file:
-				result["image"] = base64.b64encode(image_file.read()).decode("utf-8")
-			os.remove(tempFilePath)
-			result["message"] = 'Tile Downloaded'
-		else:
-			result["message"] = 'Download failed'
-
-	return jsonify(result)
+		return jsonify({"code": code, "message": "Download failed"})
 
 @app.route('/start-download', methods=['POST'])
 def start_download():
 
 	postvars = request.form
-	outputScale = 1
-	outputDirectory = postvars['outputDirectory']
-	outputFile = postvars['outputFile']
+	map_name = postvars['mapName']
 	zoom_level = int(postvars['maxZoom'])
 	timestamp = int(postvars['timestamp'])
 	bounds = list(map(float, postvars['bounds'].split(",")))
 	center = list(map(float, postvars['center'].split(",")))
 	area_rect = postvars['area']
-	launchLocation = list(map(float, postvars['launchLocation'].split(",")))
-	include_buildings = postvars.get('includeBuildlings', 'true').lower() == 'true'
+	launch_location = list(map(float, postvars['launchLocation'].split(",")))
+	include_buildings = postvars.get('includeBuildings', 'true').lower() == 'true'
 
-	outputDirectory = outputDirectory.replace("{timestamp}", str(timestamp))
-	outputFile = outputFile.replace("{timestamp}", str(timestamp))
-	filePath = os.path.join(globalParam.OUTPUT_BASE_PATH, outputDirectory, outputFile)
+	output_dir = get_map_dir(map_name)
+	if os.path.exists(output_dir):
+		shutil.rmtree(output_dir)
+	os.makedirs(output_dir)
 
-	FileWriter.addMetadata(
-		lock, os.path.join(globalParam.OUTPUT_BASE_PATH, outputDirectory), filePath, outputFile,
-		"Map Tiles Downloader via AliFlux", "jpg", bounds, center, area_rect,
-		zoom_level, "mercator", 256 * outputScale, launchLocation=launchLocation
-	)
+	metadata = {
+		"name": map_name,
+		"bounds": ','.join(map(str, bounds)),
+		"center": ','.join(map(str, center)),
+		"zoom_level": zoom_level,
+		"area": area_rect,
+		"launch_location": ','.join(map(str, launch_location)),
+		"include_buildings": include_buildings,
+		"timestamp": timestamp,
+	}
+	with open(os.path.join(output_dir, 'metadata.json'), 'w') as f:
+		json.dump(metadata, f, indent=2)
+
 	global task_status
-	task_status = {"status": "idle"} 
+	task_status = {"status": "idle"}
 	return jsonify({"code": 200, "message": "Metadata written"})
 
 @app.route('/end-download', methods=['POST'])
 def end_download():
 	postvars = request.form
-	outputDirectory = postvars['outputDirectory']
+	map_name = postvars['mapName']
 	outputFile = postvars['outputFile']
 	zoom_level = int(postvars['maxZoom'])
 	timestamp = int(postvars['timestamp'])
 	bounds = list(map(float, postvars['bounds'].split(",")))
-	include_buildings = postvars.get('includeBuildlings', 'true').lower() == 'true'
+	include_buildings = postvars.get('includeBuildings', 'true').lower() == 'true'
 
-	outputDirectory = outputDirectory.replace("{timestamp}", str(timestamp))
+	map_name = map_name.replace("{timestamp}", str(timestamp))
 	outputFile = outputFile.replace("{timestamp}", str(timestamp))
-	filePath = os.path.join(globalParam.OUTPUT_BASE_PATH, outputDirectory, outputFile)
+	filePath = os.path.join(globalParam.OUTPUT_BASE_PATH, map_name, outputFile)
 
-	FileWriter.close(lock, os.path.join(globalParam.OUTPUT_BASE_PATH, outputDirectory), filePath, zoom_level)
+	FileWriter.close(lock, os.path.join(globalParam.OUTPUT_BASE_PATH, map_name), filePath, zoom_level)
     # Start the long-running task in a background thread
-	thread = threading.Thread(target=process_end_download, args=(bounds, zoom_level, outputDirectory, outputFile, filePath, include_buildings))
+	thread = threading.Thread(target=process_end_download, args=(bounds, zoom_level, map_name, outputFile, filePath, include_buildings))
 	thread.start()
 
 	return jsonify({"code": 200, "message": "Download ended"})

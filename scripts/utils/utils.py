@@ -4,9 +4,7 @@ from urllib.parse import urlparse
 from urllib.parse import parse_qs
 from urllib.parse import parse_qsl
 import urllib.request
-import uuid
-import uuid
-import ssl
+import urllib.error
 import os
 import cv2
 import math
@@ -14,10 +12,6 @@ from utils.param import globalParam
 from PIL import Image
 
 class Utils:
-	@staticmethod
-	def randomString():
-		return uuid.uuid4().hex.upper()[0:6]
-
 	def getChildTiles(x, y, z):
 		childX = x * 2
 		childY = y * 2
@@ -103,62 +97,15 @@ class Utils:
 
 	@staticmethod
 	def downloadFile(url, destination, x, y, z):
-
 		url = Utils.qualifyURL(url, x, y, z)
-
-		code = 0
-
-		# monkey patching SSL certificate issue
-		# DONT use it in a prod/sensitive environment
-		ssl._create_default_https_context = ssl._create_unverified_context
-
 		try:
-			path, response = urllib.request.urlretrieve(url, destination)
-			code = 200
-		except urllib.error.URLError as e:
-			if not hasattr(e, "code"):
-				print(e)
-				code = -1
-			else:
-				code = e.code
-
-		return code
-
-
-	@staticmethod
-	def downloadFileScaled(url, destination, x, y, z, outputScale):
-		
-
-
-		if outputScale == 1:
-			return Utils.downloadFile(url, destination, x, y, z)
-
-		elif outputScale == 2:
-
-			childTiles = Utils.getChildTiles(x, y, z)
-			childImages = []
-
-			for childX, childY, childZ in childTiles:
-				
-				tempFile = Utils.randomString() + ".jpg"
-				tempFilePath = os.path.join(globalParam.TEMPFILE_PATH, tempFile)
-
-				code = Utils.downloadFile(url, tempFilePath, childX, childY, childZ)
-
-				if code == 200:
-					image = Image.open(tempFilePath)
-				else:
-					return code
-
-				childImages.append(image)
-			
-			canvas = Utils.mergeQuadTile(childImages)
-			# canvas.save(destination, "PNG")
-			canvas.save(destination, "JPEG")
-			
+			urllib.request.urlretrieve(url, destination)
 			return 200
+		except urllib.error.URLError as e:
+			print(e)
+			return e.code if hasattr(e, "code") else -1
 
-		#TODO implement custom scale
+
 
 class ConcatImage:
     def __init__(self,**kwargs):

@@ -719,7 +719,7 @@
         const outputFile = '{z}/{x}/{y}.png';
         const zoomLevel = config.zoomLevel;
         const source = config.tileSource;
-        const includeBuildlings = config.includeBuildings;
+        const includeBuildings = config.includeBuildings;
         const parallelDownloads = config.parallelDownloads;
 
         // Compute bounds and pivot
@@ -745,14 +745,14 @@
         try {
             const startData = new FormData();
             startData.append('maxZoom', zoomLevel);
-            startData.append('outputDirectory', modelName);
+            startData.append('mapName', modelName);
             startData.append('outputFile', outputFile);
             startData.append('timestamp', timestamp);
             startData.append('bounds', bounds.join(','));
             startData.append('center', center.join(','));
             startData.append('launchLocation', launchLocation.join(','));
             startData.append('area', area);
-            startData.append('includeBuildlings', includeBuildlings);
+            startData.append('includeBuildings', includeBuildings);
             startData.append('source', source);
             const startResp = await fetch('/start-download', { method: 'POST', body: startData });
             const startResult = await startResp.json();
@@ -772,16 +772,8 @@
             tileData.append('x', tile.x);
             tileData.append('y', tile.y);
             tileData.append('z', tile.z);
-            tileData.append('quad', generateQuadKey(tile.x, tile.y, tile.z));
-            tileData.append('outputDirectory', modelName);
-            tileData.append('outputFile', outputFile);
-            tileData.append('timestamp', timestamp);
+            tileData.append('mapName', modelName);
             tileData.append('source', source);
-            tileData.append('bounds', bounds.join(','));
-            tileData.append('center', center.join(','));
-            tileData.append('launchLocation', launchLocation.join(','));
-            tileData.append('area', area);
-            tileData.append('includeBuildlings', includeBuildlings);
 
             try {
                 const resp = await fetch('/download-tile', { method: 'POST', body: tileData });
@@ -803,11 +795,11 @@
         try {
             const endData = new FormData();
             endData.append('maxZoom', zoomLevel);
-            endData.append('outputDirectory', modelName);
+            endData.append('mapName', modelName);
             endData.append('outputFile', outputFile);
             endData.append('timestamp', timestamp);
             endData.append('bounds', bounds.join(','));
-            endData.append('includeBuildlings', includeBuildlings);
+            endData.append('includeBuildings', includeBuildings);
             const endResp = await fetch('/end-download', { method: 'POST', body: endData });
             const endResult = await endResp.json();
             if (endResult.code !== 200) throw new Error('end-download failed');
@@ -842,18 +834,6 @@
             logToConsole('Error polling status: ' + e.message, 'error');
             pollingTimer = setTimeout(pollGenerationStatus, 5000);
         }
-    }
-
-    function generateQuadKey(x, y, z) {
-        const quadKey = [];
-        for (let i = z; i > 0; i--) {
-            let digit = 0;
-            const mask = 1 << (i - 1);
-            if ((x & mask) !== 0) digit++;
-            if ((y & mask) !== 0) digit += 2;
-            quadKey.push(digit.toString());
-        }
-        return quadKey.join('');
     }
 
     // Returns tiles as {x, y, z} for a given zoom level

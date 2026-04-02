@@ -134,9 +134,9 @@ class HeightmapGenerator(ConcatImage):
         terrain_data_dir = os.path.join(tile_path, 'terrain_data')
         os.makedirs(terrain_data_dir, exist_ok=True)
 
-        # Convert OpenCV image to PIL Image and save as TIFF
+        # Convert OpenCV image to PIL Image and save as PNG
         self.heightmap = Image.fromarray(resized_map, mode='L')  # 'L' for 8-bit grayscale
-        self.heightmap.save(os.path.join(terrain_data_dir, 'height_map.tif'), format="TIFF")
+        self.heightmap.save(os.path.join(terrain_data_dir, 'height_map.png'), format="PNG")
 
     def crop_dem_image(self, px_bound, height_map):
         cropped_image = height_map[px_bound["northwest"][1]:px_bound["southeast"][1],

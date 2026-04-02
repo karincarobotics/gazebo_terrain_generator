@@ -103,7 +103,7 @@
                 <collision name="collision">
                     <geometry>
                         <heightmap>
-                            <uri>terrain_data/height_map.tif</uri>
+                            <uri>terrain_data/height_map.png</uri>
                             <size>$SIZEX$ $SIZEY$ $SIZEZ$</size>
                             <pos>$POSX$ $POSY$ $POSZ$</pos>
                         </heightmap>
@@ -120,7 +120,7 @@
                                      aerial.png is padded to square so $TEXTURE_SIZE$ = max(size_x, size_y) -->
                                 <size>$TEXTURE_SIZE$</size>
                             </texture>
-                            <uri>terrain_data/height_map.tif</uri>
+                            <uri>terrain_data/height_map.png</uri>
                             <size>$SIZEX$ $SIZEY$ $SIZEZ$</size>
                             <pos>$POSX$ $POSY$ $POSZ$</pos>
                             <sampling>2</sampling>
@@ -141,7 +141,7 @@ $BUILDING$
                 <visual name="box_visual">
                     <geometry>
                         <box>
-                            <size>5 5 5</size>
+                            <size>1 1 1</size>
                         </box>
                     </geometry>
                     <material>
@@ -150,6 +150,11 @@ $BUILDING$
                         <specular>1 1 1 1</specular>
                     </material>
                 </visual>
+                <sensor name="gps" type="navsat">
+                    <always_on>1</always_on>
+                    <update_rate>1</update_rate>
+                    <topic>navsat</topic>
+                </sensor>
             </link>
         </model>
 

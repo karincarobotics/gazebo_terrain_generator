@@ -76,12 +76,18 @@ The model `<pose>` offsets the terrain so it sits correctly relative to the laun
 X=East, Y=North, Z=Up). The model pose applies the negative of this to position the terrain
 so the launch point aligns with world (0, 0, 0).
 
-### Heightmap `<pos>` — important gotcha
+### Heightmap `<pos>` — critical gz-sim behavior (confirmed by live test)
 
-In gz-sim, the heightmap `<pos>` element inside `<geometry>` is relative to the **link frame**.
-The model `<pose>` already positions the link in world space. Having the same offset in both
-`<model><pose>` AND `<heightmap><pos>` causes a double-shift. The template uses `<pos>0 0 0</pos>`
-and relies solely on the model `<pose>` for positioning.
+In gz-sim, the heightmap `<pos>` element is in **world frame** — it directly sets the world
+position of the heightmap center. The model `<pose>` has **no effect** on heightmap placement.
+
+Correct template pattern:
+- `<heightmap><pos>$POSX$ $POSY$ $POSZ$</pos>` — controls actual heightmap world position
+- `<model><pose>0 0 0 0 0 0</pose>` — irrelevant for heightmap, set to zero for clarity
+
+Do NOT use model `<pose>` to position the heightmap — it will be ignored and the terrain
+will appear at the wrong location. This was verified by spawning a box at world (0,0,0)
+and observing it align with the launch pin location only when `<pos>` carried the offset.
 
 ---
 

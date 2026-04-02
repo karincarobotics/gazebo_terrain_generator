@@ -77,6 +77,38 @@ class OrthoGenerator(ConcatImage):
 
         stitched_image = cv2.hconcat(column_images)
 
+        # gz-sim normalizes texture UV by size_x for both axes, so a non-square image
+        # causes the shorter dimension to be cut off. Pad to square with gray so all
+        # tiles remain visible regardless of bounding box aspect ratio.
+        h, w = stitched_image.shape[:2]
+        if h != w:
+            max_dim = max(h, w)
+            padded = np.full((max_dim, max_dim, 3), 128, dtype=np.uint8)
+            padded[:h, :w] = stitched_image
+            stitched_image = padded
+
+        if globalParam.DEBUG_TILE_BORDERS:
+            n_cols = x_max - x_min + 1
+            n_rows = y_max - y_min + 1
+            border_color = (0, 0, 255)  # red in BGR
+            # Vertical lines at each column boundary
+            for col in range(n_cols + 1):
+                px = col * tile_w
+                cv2.line(stitched_image, (px, 0), (px, stitched_image.shape[0] - 1), border_color, 1)
+            # Horizontal lines at each row boundary
+            for row in range(n_rows + 1):
+                py = row * tile_h
+                cv2.line(stitched_image, (0, py), (stitched_image.shape[1] - 1, py), border_color, 1)
+            # Label each tile with its [zoom,y,x] coordinates
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            for col_idx, x in enumerate(range(x_min, x_max + 1)):
+                for row_idx, y in enumerate(range(y_min, y_max + 1)):
+                    label = f"[{zoom_level},{y},{x}]"
+                    text_x = col_idx * tile_w + 4
+                    text_y = row_idx * tile_h + 16
+                    cv2.putText(stitched_image, label, (text_x, text_y), font, 0.4, (0, 0, 0), 2)
+                    cv2.putText(stitched_image, label, (text_x, text_y), font, 0.4, border_color, 1)
+
         # Save the stitched image
         compression_params = [cv2.IMWRITE_PNG_COMPRESSION, 9]
         cv2.imwrite(os.path.join(output_dir, 'aerial.png'), stitched_image, compression_params)

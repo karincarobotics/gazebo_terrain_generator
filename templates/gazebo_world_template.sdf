@@ -74,11 +74,15 @@
         <gravity>0 0 -9.8066</gravity>
 
         <gui fullscreen='0'>
-            <!--VTODO: set camera position accordingly, maybe relative to helipad-->
+            <!--VTODO: set camera position accordingly, looking north (currently looking east and nose down around 50m height)-->
             <camera name='user_camera'>
-                <pose>0.0 0.0 0.0 0 0.53 -0.79</pose>
+                <pose>0.0 0.0 0.0 0 0 0</pose>
                 <view_controller>orbit</view_controller>
                 <projection_type>perspective</projection_type>
+                <clip>
+                    <near>0.01</near>
+                    <far>10000</far>
+                </clip>
             </camera>
         </gui>
 
@@ -90,9 +94,10 @@
         </spherical_coordinates>
 
         <!-- Terrain model — inlined, no model:// URI required -->
+        <!-- Note: gz-sim positions heightmaps via <pos> in world frame; model <pose> has no effect on heightmap placement -->
         <model name="$MODELNAME$">
             <static>true</static>
-            <pose>$POSX$ $POSY$ $POSZ$ 0 0 0</pose>
+            <pose>0 0 0 0 0 0</pose>
 
             <link name="ground">
                 <collision name="collision">
@@ -100,7 +105,7 @@
                         <heightmap>
                             <uri>terrain_data/height_map.tif</uri>
                             <size>$SIZEX$ $SIZEY$ $SIZEZ$</size>
-                            <pos>0 0 0</pos>
+                            <pos>$POSX$ $POSY$ $POSZ$</pos>
                         </heightmap>
                     </geometry>
                 </collision>
@@ -111,11 +116,13 @@
                             <texture>
                                 <diffuse>terrain_data/aerial.png</diffuse>
                                 <normal>terrain_data/aerial.png</normal>
-                                <size>$SIZEX$ $SIZEY$ $SIZEZ$</size>
+                                <!-- gz-sim normalizes texture UV by size_x for both axes;
+                                     aerial.png is padded to square so $TEXTURE_SIZE$ = max(size_x, size_y) -->
+                                <size>$TEXTURE_SIZE$</size>
                             </texture>
                             <uri>terrain_data/height_map.tif</uri>
                             <size>$SIZEX$ $SIZEY$ $SIZEZ$</size>
-                            <pos>0 0 0</pos>
+                            <pos>$POSX$ $POSY$ $POSZ$</pos>
                             <sampling>2</sampling>
                         </heightmap>
                     </geometry>
@@ -124,6 +131,26 @@
 
 $BUILDING$
 
+        </model>
+
+        <!-- Simple box model at origin used for debugging-->
+        <model name="box">
+            <pose>0 0 0 0 0 0</pose>
+            <static>true</static>
+            <link name="box_link">
+                <visual name="box_visual">
+                    <geometry>
+                        <box>
+                            <size>5 5 5</size>
+                        </box>
+                    </geometry>
+                    <material>
+                        <ambient>1 0 0 1</ambient>
+                        <diffuse>1 0 0 1</diffuse>
+                        <specular>1 1 1 1</specular>
+                    </material>
+                </visual>
+            </link>
         </model>
 
 

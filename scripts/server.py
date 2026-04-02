@@ -49,7 +49,7 @@ def process_end_download(map_name, bounds, zoom_level, dem_resolution, include_b
 
 		if include_buildings:
 			print("Starting building data download...")
-			download_steetmap_data(true_boundaries, globalParam.BUILDING_PATH, map_dir)
+			download_steetmap_data(true_boundaries, os.path.join(map_dir, 'building_tiles'), os.path.join(map_dir, 'terrain_data'))
 
 		terrian_generator = GazeboTerrianGenerator(map_dir, include_buildings)
 		terrian_generator.generate_gazebo_world()

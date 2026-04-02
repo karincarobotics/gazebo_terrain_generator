@@ -27,7 +27,8 @@ class FileWriter:
     def write_world_file(sdf_template, model_name,
                          size_x, size_y, size_z, pose_x, pose_y, pose_z,
                          launch_lat, launch_lon, origin_elevation,
-                         include_buildings, output_dir):
+                         include_buildings, output_dir,
+                         texture_size=None):
         '''
         Write a Gazebo world file with the terrain model inlined.
 
@@ -63,6 +64,7 @@ class FileWriter:
         sdf_template = sdf_template.replace("$ORIGIN_LONG$", str(launch_lon))
         sdf_template = sdf_template.replace("$ORIGIN_ELEVATION$", str(origin_elevation))
         sdf_template = sdf_template.replace("$BUILDING$", buildings_sdf_block)
+        sdf_template = sdf_template.replace("$TEXTURE_SIZE$", str(texture_size if texture_size is not None else max(size_x, size_y)))
 
         os.makedirs(output_dir, exist_ok=True)
         with open(os.path.join(output_dir, model_name + ".world"), "w") as f:

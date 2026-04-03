@@ -93,6 +93,9 @@ class GeoJSONToDAE:
         return []
 
     # ---------------- PIXEL MATH ----------------
+    # Small downward offset applied to all building bases to compensate for
+    # terrain interpolation errors between our pixel lookup and Gazebo's rendering.
+    BUILDING_Z_SINK = 0.1
     def get_pixel_elevation(self, lat, lon):
         """Converts Lat/Lon to World Z using the Heightmap Image."""
         # 1. Unpack Bounds
@@ -116,12 +119,12 @@ class GeoJSONToDAE:
         pixel_val = self.heightmap.getpixel((px, py))
         
         # 4. Convert to Local Terrain Height (Meters)
-        # Formula: (Pixel / 255) * Total_Terrain_Z_Height
-        local_z = (pixel_val / 255.0) * self.size_z
+        # Formula: (Pixel / 65535) * Total_Terrain_Z_Height  (16-bit heightmap)
+        local_z = (pixel_val / 65535.0) * self.size_z
         
         # 5. Apply Terrain World Offset
         # The terrain model itself is shifted by terrain_pose_z in the world
-        return local_z + self.pose_z
+        return local_z + self.pose_z - self.BUILDING_Z_SINK
 
     def handle_polygon(self, geom: Polygon, height: float):
         if geom.area < 0.1:
@@ -195,6 +198,7 @@ class GeoJSONToDAE:
 
                 if mesh:
                     mesh.apply_translation([0, 0, pose_z])
+                    mesh.merge_vertices()
                     self.meshes.append(mesh)
 
     def export(self):
@@ -205,6 +209,10 @@ class GeoJSONToDAE:
         print(f"Merging {len(self.meshes)} meshes...")
         combined = trimesh.util.concatenate(self.meshes)
 
+        # unmerge_vertices() ensures no vertices are shared between faces.
+        # Without this, fix_normals() averages normals at shared edges (roof/wall junction),
+        # producing smooth shading that makes buildings look like blobs instead of sharp boxes.
+        combined.unmerge_vertices()
         combined.fix_normals()
         combined.export(self.output_dae)
 
@@ -215,7 +223,7 @@ class GeoJSONToDAE:
         # Bounds are typically [South (min_lat), West (min_lon), North (max_lat), East (max_lon)]
         self.center_lat = origin_cords["latitude"]
         self.center_lon = origin_cords["longitude"]
-        self.create_amsl = origin_cords["altitude"]
+        self.centre_amsl = origin_cords["altitude"]
         self.size_z = size_z
         self.pose_z = pose_z
         self.heightmap = heightmap

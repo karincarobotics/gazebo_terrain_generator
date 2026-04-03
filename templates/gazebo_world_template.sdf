@@ -143,9 +143,9 @@
                 </visual>
             </link>
 
-$BUILDING$
-
         </model>
+
+$BUILDING$
 
         <!-- Simple sphere model at origin used for debugging-->
         <model name="sphere">

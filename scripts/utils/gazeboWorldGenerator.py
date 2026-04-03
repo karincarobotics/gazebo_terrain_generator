@@ -291,18 +291,27 @@ class GazeboTerrianGenerator(HeightmapGenerator,OrthoGenerator):
 
         return self.size_x,self.size_y,self.size_z,pose_x,pose_y,pose_z
 
-    def generate_gazebo_world(self):
+    def generate_gazebo_world(self, progress_cb=None):
         """
             Generate the gazebo world along with world files.
         """
+        def progress(msg):
+            print(msg)
+            if progress_cb:
+                progress_cb(msg)
 
-        print("Map tiles directory being used : ", self.tile_path)
         if os.path.isfile(os.path.join(self.tile_path, 'metadata.json')) and self.tile_path != '':
+            progress("Stitching satellite tiles...")
             self.generate_ortho(self.tile_path, self.zoom_level)
-            print("Satellite image generated successfully")
+
+            progress("Processing heightmap...")
             self.generate_rgb_heightmap(self.tile_path, self.boundaries, self.zoom_level, os.path.join(self.tile_path, 'dem'), self.dem_resolution)
+
+            progress("Computing world dimensions...")
             (size_x, size_y, size_z, pose_x, pose_y, pose_z) = self.get_world_dimensions()
+
             if self.include_buildings:
+                progress("Baking building models...")
                 origin_coord = self.get_true_origin()
                 terrain_data_dir = os.path.join(self.tile_path, 'terrain_data')
                 street_map = os.path.join(terrain_data_dir, 'buildings.geojson')
@@ -310,6 +319,6 @@ class GazeboTerrianGenerator(HeightmapGenerator,OrthoGenerator):
                 true_boundaries = maptile_utiles.get_true_boundaries(self.boundaries.split(','), self.zoom_level)
                 geojson_to_dae = GeoJSONToDAE(street_map, output_dae_file)
                 geojson_to_dae.run(origin_coord, size_z, pose_z, self.heightmap, true_boundaries)
-                print("Building models generated successfully")
+
+            progress("Writing world file...")
             self.gen_world(size_x, size_y, size_z, pose_x, pose_y, pose_z)
-            print("Gazebo world file saved to:", os.path.join(self.tile_path, self.model_name + ".world"))

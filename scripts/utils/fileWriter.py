@@ -49,7 +49,10 @@ class FileWriter:
             building_template = FileWriter.read_template(
                 os.path.join(globalParam.TEMPLATE_DIR_PATH, 'building_template.sdf')
             )
-            buildings_sdf_block = building_template.replace("$BUILDING_POSE_Z$", f"{-origin_elevation:.2f}")
+            buildings_sdf_block = (building_template
+                .replace("$MODELNAME$", model_name)
+                .replace("$POSX$", str(pose_x))
+                .replace("$POSY$", str(pose_y)))
         else:
             buildings_sdf_block = ""
 

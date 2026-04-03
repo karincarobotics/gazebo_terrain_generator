@@ -10,7 +10,7 @@ import tempfile
 from pathlib import Path
 import mimetypes
 from utils.demTilesDownloader import download_dem_data
-from utils.buildingDownloader import download_steetmap_data
+from utils.buildingDownloader import download_streetmap_data
 from utils.utils import Utils
 from utils.gazeboWorldGenerator import GazeboTerrianGenerator
 from utils.maptileUtils import maptile_utiles
@@ -38,26 +38,36 @@ def bounds_from_polygon(vertices):
 	return [min(lngs), min(lats), max(lngs), max(lats)]
 
 
-def process_end_download(map_name, bounds, zoom_level, dem_resolution, include_buildings):
+def process_end_download(map_name, bounds, zoom_level, dem_resolution, include_buildings, polygon_vertices):
 	global task_status
+
+	def progress(msg):
+		task_status["message"] = msg
+		print(msg)
+
 	try:
 		task_status["status"] = "in_progress"
+		task_status["message"] = ""
 		map_dir = get_map_dir(map_name)
 		true_boundaries = maptile_utiles.get_true_boundaries(bounds, zoom_level)
+
+		progress("Downloading elevation data (DEM)...")
 		dem_path = os.path.join(map_dir, 'dem')
 		download_dem_data(true_boundaries, dem_path, dem_resolution)
 
 		if include_buildings:
-			print("Starting building data download...")
-			download_steetmap_data(true_boundaries, os.path.join(map_dir, 'building_tiles'), os.path.join(map_dir, 'terrain_data'))
+			progress("Downloading building footprint data...")
+			download_streetmap_data(true_boundaries, os.path.join(map_dir, 'building_tiles'), os.path.join(map_dir, 'terrain_data'), polygon_vertices=polygon_vertices)
 
 		terrian_generator = GazeboTerrianGenerator(map_dir, include_buildings)
-		terrian_generator.generate_gazebo_world()
+		terrian_generator.generate_gazebo_world(progress_cb=progress)
 		task_status["status"] = "completed"
+		task_status["message"] = "World generated successfully."
 		print("Gazebo world generation completed successfully.")
 
 	except Exception as e:
 		task_status["status"] = "failed"
+		task_status["message"] = f"Error: {e}"
 		print(f"Error during processing: {e}")
 
 
@@ -167,7 +177,7 @@ def end_download():
 	include_buildings = postvars.get('includeBuildings', 'false').lower() == 'true'
 	dem_resolution = min(zoom_level, 13)
 
-	thread = threading.Thread(target=process_end_download, args=(map_name, bounds, zoom_level, dem_resolution, include_buildings))
+	thread = threading.Thread(target=process_end_download, args=(map_name, bounds, zoom_level, dem_resolution, include_buildings, polygon_vertices))
 	thread.start()
 
 	return jsonify({"code": 200, "message": "Download ended"})

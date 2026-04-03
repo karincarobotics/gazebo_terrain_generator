@@ -4,7 +4,7 @@ import requests
 import mapbox_vector_tile
 from pathlib import Path
 from typing import List, Tuple, Dict, Any
-from shapely.geometry import shape, mapping
+from shapely.geometry import shape, mapping, Polygon as ShapelyPolygon
 from shapely.ops import unary_union
 from utils.param import globalParam
 from utils.maptileUtils import maptile_utiles
@@ -46,10 +46,10 @@ class BuildingDownloader:
             response = requests.get(url, timeout=30)
             response.raise_for_status()
 
-            # Decode the Protocol Buffer vector tile
+            # Decode the Protocol Buffer vector tile and cache as JSON
             tile_data = mapbox_vector_tile.decode(response.content)
-            json.dump(tile_data, open(f"{output_dir}/{y}.json", "w"), indent=2)  # For debugging
-            # Convert to GeoJSON
+            with open(f"{output_dir}/{y}.json", "w") as f:
+                json.dump(tile_data, f)
         except Exception as e:
             print(f"Error while downloading tile {zoom}/{x}/{y}: {e}")
             return {"type": "FeatureCollection", "features": []}
@@ -139,37 +139,12 @@ class BuildingDownloader:
             "properties": properties
         }
 
-    def bound_array_to_boundary_geojson(self,bound_array):
-        ne = bound_array["northeast"]
-        nw = bound_array["northwest"]
-        se = bound_array["southeast"]
-        sw = bound_array["southwest"]
-
-        return {
-            "type": "FeatureCollection",
-            "features": [
-                {
-                    "type": "Feature",
-                    "geometry": {
-                        "type": "Polygon",
-                        "coordinates": [[
-                            [nw[1], nw[0]],
-                            [ne[1], ne[0]],
-                            [se[1], se[0]],
-                            [sw[1], sw[0]],
-                            [nw[1], nw[0]]
-                        ]]
-                    },
-                    "properties": {}
-                }
-            ]
-        }
-    
     def download_buildings(
         self,
         bound_array: Dict[str, Any],
         zoom: int = globalParam.DEM_BUILDING_RESOLUTION,
-        output_directory: str = None
+        output_directory: str = None,
+        polygon_vertices: list = None  # [[lng, lat], ...] drawn polygon from frontend
     ) -> Dict[str, Any]:
         """
         Download and read all buildings within the given bounds.
@@ -219,12 +194,8 @@ class BuildingDownloader:
             with Pool(processes=cpu_count()) as pool:
                 pool.starmap(BuildingDownloader.download_tile, tasks)
 
-        boundary_geojson = self.bound_array_to_boundary_geojson(bound_array)
-        true_boundary = unary_union([
-            shape(f["geometry"])
-            for f in boundary_geojson["features"]
-            if f.get("geometry")
-        ])
+        filter_shape = ShapelyPolygon(polygon_vertices)
+
         # ---- READ tiles ONE BY ONE (important part) ----
         for x in range(tilex_start, tilex_end + 1):
             for y in range(tiley_start, tiley_end + 1):
@@ -245,7 +216,8 @@ class BuildingDownloader:
                     geom = shape(feature["geometry"])
 
                     # ---- EARLY TRUE BOUNDARY FILTER ----
-                    if not geom.intersects(true_boundary):
+                    # Use within() not intersects() — exclude buildings that merely touch the edge
+                    if not geom.within(filter_shape):
                         continue
                     feature_id = self._get_feature_id(feature)
 
@@ -387,10 +359,10 @@ class BuildingDownloader:
 
 
 
-def download_steetmap_data(bound_array, output_directory, model_path, zoom_level: int =globalParam.DEM_BUILDING_RESOLUTION) :
+def download_streetmap_data(bound_array, output_directory, model_path, zoom_level: int = globalParam.DEM_BUILDING_RESOLUTION, polygon_vertices: list = None):
     #try:
     downloader = BuildingDownloader()
-    
+
     # Download buildings at zoom 15 (good detail for buildings)
     street_map_path = os.path.join(model_path,
         'buildings.geojson'
@@ -398,7 +370,8 @@ def download_steetmap_data(bound_array, output_directory, model_path, zoom_level
     buildings_geojson = downloader.download_buildings(
         bound_array=bound_array,
         zoom=zoom_level,
-        output_directory=output_directory
+        output_directory=output_directory,
+        polygon_vertices=polygon_vertices
     )
     # Print statistics
     stats = downloader.get_building_stats(buildings_geojson)

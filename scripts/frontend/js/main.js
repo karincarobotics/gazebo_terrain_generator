@@ -801,23 +801,30 @@
         pollGenerationStatus();
     }
 
+    let lastProgressMessage = '';
+
     async function pollGenerationStatus() {
         if (generationCancelled) return;
         try {
             const resp = await fetch('/task-status');
             const data = await resp.json();
             const status = data.message.status;
+            const msg = data.message.message || '';
 
             if (status === 'completed') {
-                logToConsole('Gazebo world generated successfully!', 'success');
+                if (msg && msg !== lastProgressMessage) logToConsole(msg, 'success');
                 setConsoleStatus('completed');
                 setConsoleCloseMode();
             } else if (status === 'failed') {
-                logToConsole('World generation failed on server.', 'error');
+                if (msg && msg !== lastProgressMessage) logToConsole(msg, 'error');
                 setConsoleStatus('failed');
                 setConsoleCloseMode();
             } else {
-                pollingTimer = setTimeout(pollGenerationStatus, 3000);
+                if (msg && msg !== lastProgressMessage) {
+                    logToConsole(msg);
+                    lastProgressMessage = msg;
+                }
+                pollingTimer = setTimeout(pollGenerationStatus, 1000);
             }
         } catch (e) {
             logToConsole('Error polling status: ' + e.message, 'error');

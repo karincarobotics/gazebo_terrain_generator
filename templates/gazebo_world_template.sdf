@@ -88,7 +88,7 @@
                 <projection_type>perspective</projection_type>
                 <clip>
                     <near>0.01</near>
-                    <far>10000</far>
+                    <far>1000</far>
                 </clip>
             </camera>
         </gui>

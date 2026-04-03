@@ -40,23 +40,29 @@
 
         <light type="directional" name="sun">
             <cast_shadows>true</cast_shadows>
-            <pose>0 0 10 0 0 0</pose>
-            <diffuse>0.8 0.8 0.8 1</diffuse>
-            <specular>0.2 0.2 0.2 1</specular>
-            <attenuation>
-                <range>1000</range>
-                <constant>0.9</constant>
-                <linear>0.01</linear>
-                <quadratic>0.001</quadratic>
-            </attenuation>
-            <direction>-0.5 0.1 -0.9</direction>
+            <pose>0 0 1000 0 0 0</pose>
+            <diffuse>0.9 0.88 0.82 1</diffuse>
+            <!-- Zero specular prevents glint/reflection artifacts on terrain -->
+            <specular>0 0 0 1</specular>
+            <!-- Realistic mid-afternoon sun: ~60° elevation from south-west -->
+            <direction>0.4 0.2 -0.9</direction>
         </light>
 
-        <!-- VTODO: Uncomment later, it might create an artifact-->
-<!--        <scene>-->
-<!--            <grid>0</grid>-->
-<!--            <origin_visual>0</origin_visual>-->
-<!--        </scene>-->
+        <scene>
+            <!-- Ambient fills in shadows — simulates sky/bounce light -->
+            <ambient>0.45 0.48 0.55 1</ambient>
+            <grid>false</grid>
+            <origin_visual>false</origin_visual>
+            <!-- Procedural sky with atmosphere scattering and clouds -->
+            <sky>
+                <time>10</time>
+                <sunrise>6</sunrise>
+                <sunset>20</sunset>
+                <clouds>
+                    <speed>12</speed>
+                </clouds>
+            </sky>
+        </scene>
 
         <!-- Polymath standard physics simulation engine config,
         ODE does not behave correctly with heightmaps, we'll use bullet instead -->
@@ -94,18 +100,24 @@
         </spherical_coordinates>
 
         <!-- Terrain model — inlined, no model:// URI required -->
-        <!-- Note: gz-sim positions heightmaps via <pos> in world frame; model <pose> has no effect on heightmap placement -->
+        <!-- OGRE2 ignores both model and link <pose> for heightmap visuals;
+             visual position is controlled by <heightmap><pos> (world frame).
+             DART ignores <heightmap><pos> for collision; collision position
+             is controlled by <collision><pose> (standard SDF pose chain). -->
         <model name="$MODELNAME$">
             <static>true</static>
             <pose>0 0 0 0 0 0</pose>
 
             <link name="ground">
                 <collision name="collision">
+                    <pose>$POSX$ $POSY$ $POSZ$ 0 0 0</pose>
                     <geometry>
                         <heightmap>
                             <uri>terrain_data/height_map.png</uri>
                             <size>$SIZEX$ $SIZEY$ $SIZEZ$</size>
-                            <pos>$POSX$ $POSY$ $POSZ$</pos>
+                            <!-- DART ignores <pos> for collision heightmaps; positioning
+                                 is handled by <collision><pose> above instead -->
+                            <pos>0 0 0</pos>
                         </heightmap>
                     </geometry>
                 </collision>
@@ -115,13 +127,14 @@
                             <use_terrain_paging>false</use_terrain_paging>
                             <texture>
                                 <diffuse>terrain_data/aerial.png</diffuse>
-                                <normal>terrain_data/aerial.png</normal>
-                                <!-- gz-sim normalizes texture UV by size_x for both axes;
-                                     aerial.png is padded to square so $TEXTURE_SIZE$ = max(size_x, size_y) -->
+                                <!-- Flat normal map (128,128,255): normals point straight up, no artifacts.
+                                     TODO: replace with a proper normal map derived from the heightmap. -->
+                                <normal>terrain_data/flat_normal.png</normal>
                                 <size>$TEXTURE_SIZE$</size>
                             </texture>
                             <uri>terrain_data/height_map.png</uri>
                             <size>$SIZEX$ $SIZEY$ $SIZEZ$</size>
+                            <!-- OGRE2 ignores model/link <pose> for heightmaps; <pos> is world frame -->
                             <pos>$POSX$ $POSY$ $POSZ$</pos>
                             <sampling>2</sampling>
                         </heightmap>
@@ -133,16 +146,43 @@ $BUILDING$
 
         </model>
 
-        <!-- Simple box model at origin used for debugging-->
-        <model name="box">
-            <pose>0 0 0 0 0 0</pose>
-            <static>true</static>
-            <link name="box_link">
-                <visual name="box_visual">
+        <!-- Simple sphere model at origin used for debugging-->
+        <model name="sphere">
+            <pose>0 0 400 0 0 0</pose>
+            <static>false</static>
+            <link name="sphere_link">
+                <inertial>
+                    <mass>1.0</mass>
+                    <inertia>
+                        <!-- solid sphere: I = 2/5 * m * r^2, r=5 -> I=10 -->
+                        <ixx>10.0</ixx><iyy>10.0</iyy><izz>10.0</izz>
+                        <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+                    </inertia>
+                </inertial>
+                <collision name="sphere_collision">
                     <geometry>
-                        <box>
-                            <size>1 1 1</size>
-                        </box>
+                        <sphere>
+                            <radius>5</radius>
+                        </sphere>
+                    </geometry>
+                    <surface>
+                        <bounce>
+                            <restitution_coefficient>0</restitution_coefficient>
+                            <threshold>1e6</threshold>
+                        </bounce>
+                        <friction>
+                            <ode>
+                                <mu>10</mu>
+                                <mu2>10</mu2>
+                            </ode>
+                        </friction>
+                    </surface>
+                </collision>
+                <visual name="sphere_visual">
+                    <geometry>
+                        <sphere>
+                            <radius>5</radius>
+                        </sphere>
                     </geometry>
                     <material>
                         <ambient>1 0 0 1</ambient>

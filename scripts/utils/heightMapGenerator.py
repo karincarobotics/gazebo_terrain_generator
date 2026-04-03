@@ -126,17 +126,22 @@ class HeightmapGenerator(ConcatImage):
         self.max_height = np.max(height_map)
         self.min_height = np.min(height_map)
 
-        height_img_normalized = ((height_map - np.min(height_map)) / (np.max(height_map) - np.min(height_map)) * 255).astype(np.uint8)
+        # 16-bit encoding: 65535 levels vs 255 → ~0.008m precision for 534m range (vs 2.1m for 8-bit)
+        height_img_normalized = ((height_map - np.min(height_map)) / (np.max(height_map) - np.min(height_map)) * 65535).astype(np.uint16)
 
-        size = HeightmapGenerator.get_nearest_map_size(height, width)
-        resized_map = cv2.resize(height_img_normalized, (size, size), interpolation=cv2.INTER_LINEAR)
+        from utils.param import globalParam
+        upscale_factor = 2 ** (zoomlevel - dem_resolution)
+        target = min(max(height, width) * upscale_factor, globalParam.MAX_HEIGHTMAP_SIZE)
+        size = HeightmapGenerator.get_nearest_map_size(int(target), int(target))
+        resized_map = cv2.resize(height_img_normalized, (size, size), interpolation=cv2.INTER_CUBIC)
 
         terrain_data_dir = os.path.join(tile_path, 'terrain_data')
         os.makedirs(terrain_data_dir, exist_ok=True)
 
-        # Convert OpenCV image to PIL Image and save as PNG
-        self.heightmap = Image.fromarray(resized_map, mode='L')  # 'L' for 8-bit grayscale
-        self.heightmap.save(os.path.join(terrain_data_dir, 'height_map.png'), format="PNG")
+        # Save as 16-bit PNG via cv2 (PIL 'I' mode saves 32-bit; cv2 handles uint16 correctly)
+        cv2.imwrite(os.path.join(terrain_data_dir, 'height_map.png'), resized_map)
+        # Keep PIL image in memory for pixel lookups (mode 'I' stores uint16 values as int32)
+        self.heightmap = Image.fromarray(resized_map.astype(np.int32), mode='I')
 
     def crop_dem_image(self, px_bound, height_map):
         cropped_image = height_map[px_bound["northwest"][1]:px_bound["southeast"][1],

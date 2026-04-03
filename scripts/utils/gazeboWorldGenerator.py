@@ -113,6 +113,16 @@ class OrthoGenerator(ConcatImage):
         compression_params = [cv2.IMWRITE_PNG_COMPRESSION, 9]
         cv2.imwrite(os.path.join(output_dir, 'aerial.png'), stitched_image, compression_params)
 
+        # Flat normal map: RGB(128,128,255) = normal pointing straight up.
+        # Stored as BGR for OpenCV: B=255, G=128, R=128.
+        # Placeholder until a proper normal map is derived from the heightmap.
+        h, w = stitched_image.shape[:2]
+        flat_normal = np.empty((h, w, 3), dtype=np.uint8)
+        flat_normal[:, :, 0] = 255  # B → Z (up)
+        flat_normal[:, :, 1] = 128  # G → Y (neutral)
+        flat_normal[:, :, 2] = 128  # R → X (neutral)
+        cv2.imwrite(os.path.join(output_dir, 'flat_normal.png'), flat_normal, compression_params)
+
 
 
 class GazeboTerrianGenerator(HeightmapGenerator,OrthoGenerator):
@@ -277,8 +287,6 @@ class GazeboTerrianGenerator(HeightmapGenerator,OrthoGenerator):
         """ 
         Get the dimensions of the world based on the heightmap.
 
-        Offset the origin height by 3% of the launch height to avoid collision with the ground.
-
         Args:
             None
         Returns:
@@ -307,8 +315,8 @@ class GazeboTerrianGenerator(HeightmapGenerator,OrthoGenerator):
         )
 
         # Calculate launch height and pose offset
-        launch_height = self.heightmap.getpixel((launch_px, launch_py)) * self.size_z / 255
-        pose_z = round(-1 * (launch_height + 0.03 * launch_height), 2)  
+        launch_height = self.heightmap.getpixel((launch_px, launch_py)) * self.size_z / 65535
+        pose_z = round(-launch_height, 2)
 
         return self.size_x,self.size_y,self.size_z,pose_x,pose_y,pose_z
 

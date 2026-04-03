@@ -76,18 +76,29 @@ The model `<pose>` offsets the terrain so it sits correctly relative to the laun
 X=East, Y=North, Z=Up). The model pose applies the negative of this to position the terrain
 so the launch point aligns with world (0, 0, 0).
 
-### Heightmap `<pos>` — critical gz-sim behavior (confirmed by live test)
+### Heightmap positioning — confirmed gz-sim behavior (live tested)
 
-In gz-sim, the heightmap `<pos>` element is in **world frame** — it directly sets the world
-position of the heightmap center. The model `<pose>` has **no effect** on heightmap placement.
+OGRE2 (visual) and DART/Bullet (collision) use **different** positioning mechanisms for heightmaps:
+
+**Visual (OGRE2):**
+- `<heightmap><pos>` is in **world frame** and is the only way to position the visual heightmap
+- Model `<pose>` AND link `<pose>` are both **ignored** by OGRE2 for heightmap visuals (confirmed by test)
+
+**Collision (DART/Bullet):**
+- `<heightmap><pos>` is **ignored** by DART (changing it has no effect on collisions)
+- `<collision><pose>` (standard SDF pose) IS respected by DART
 
 Correct template pattern:
-- `<heightmap><pos>$POSX$ $POSY$ $POSZ$</pos>` — controls actual heightmap world position
-- `<model><pose>0 0 0 0 0 0</pose>` — irrelevant for heightmap, set to zero for clarity
+```xml
+<collision name="collision">
+    <pose>$POSX$ $POSY$ $POSZ$ 0 0 0</pose>   <!-- DART respects this -->
+    <geometry><heightmap><pos>0 0 0</pos>...    <!-- DART ignores this -->
 
-Do NOT use model `<pose>` to position the heightmap — it will be ignored and the terrain
-will appear at the wrong location. This was verified by spawning a box at world (0,0,0)
-and observing it align with the launch pin location only when `<pos>` carried the offset.
+<visual name="ground_visual">
+    <geometry><heightmap><pos>$POSX$ $POSY$ $POSZ$</pos>...  <!-- OGRE2 respects this -->
+```
+
+Do NOT try to use model or link `<pose>` to position heightmaps — both are ignored by OGRE2.
 
 ---
 

@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 class globalParam:
@@ -8,7 +7,7 @@ class globalParam:
 
     # Maximum heightmap output size (must be 2^n+1 for Gazebo).
     # At zoom 17+, the DEM→satellite upscale factor always exceeds this cap.
-    MAX_HEIGHTMAP_SIZE          = 8193
+    MAX_HEIGHTMAP_SIZE          = 4095
 
     # Draw tile borders on aerial.png output for debugging tile grid alignment
     DEBUG_TILE_BORDERS          = False

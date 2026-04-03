@@ -87,27 +87,8 @@ class HeightmapGenerator(ConcatImage):
         true_bound_array = [true_boundaries["southwest"][1], true_boundaries["southwest"][0],
                             true_boundaries["northeast"][1], true_boundaries["northeast"][0]]
 
-        # Parse flat DEM tile filenames: [zoom,y,x].png → group by x-column, sort by y-row
-        tile_map = {}  # (x, y) → path
-        for fname in os.listdir(dem_path):
-            if not fname.endswith('.png'):
-                continue
-            parts = fname[1:-5].split(',')  # strip '[' and '].png'
-            z, y, x = int(parts[0]), int(parts[1]), int(parts[2])
-            tile_map[(x, y)] = os.path.join(dem_path, fname)
-
-        x_min = min(x for x, y in tile_map)
-        x_max = max(x for x, y in tile_map)
-        y_min = min(y for x, y in tile_map)
-        y_max = max(y for x, y in tile_map)
-
-        column_images = []
-        for x in range(x_min, x_max + 1):
-            rows = [cv2.imread(tile_map[(x, y)]) for y in range(y_min, y_max + 1) if (x, y) in tile_map]
-            rows = [img for img in rows if img is not None]
-            if rows:
-                column_images.append(cv2.vconcat(rows))
-        stitched_image = cv2.hconcat(column_images)
+        # Stitch all DEM tiles (no zoom filter — DEM dir contains only DEM tiles)
+        stitched_image, _, _, _, _, _ = self.stitch_flat_tiles(dem_path, zoom_level=None)
 
         # dem_snap_boundaries: the tile-aligned bounds of the stitched DEM image at DEM resolution,
         # used to crop back down to the actual desired area (true_boundaries)

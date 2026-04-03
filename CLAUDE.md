@@ -11,7 +11,7 @@ A web-based tool that generates a Gazebo world from real-world satellite and ter
 The user draws a polygon on a map, selects a zoom level and launch location, and the tool:
 1. Downloads satellite tiles (Mapbox) and DEM tiles (Mapbox Terrain-DEM-v1) for the selected area
 2. Stitches satellite tiles into an aerial texture (`aerial.png`)
-3. Generates a normalized grayscale heightmap (`height_map.tif`) for Gazebo
+3. Generates a normalized grayscale heightmap (`height_map.png`) for Gazebo
 4. Optionally downloads and converts OSM buildings to a 3D mesh (`buildings.dae`)
 5. Writes a self-contained Gazebo world file (`{model_name}.world`)
 
@@ -29,7 +29,7 @@ The generated world is fully self-contained — no `GAZEBO_MODEL_PATH` or enviro
   dem/[zoom,y,x].png     — flat DEM tiles (zoom = min(satellite_zoom, 13))
   terrain_data/
     aerial.png            — stitched satellite image
-    height_map.tif        — normalized grayscale heightmap (2^n+1 size for Gazebo)
+    height_map.png        — normalized 16-bit grayscale heightmap (2^n+1 size for Gazebo)
     buildings.dae         — only if include_buildings=True
     buildings.geojson     — only if include_buildings=True
   {model_name}.world      — self-contained Gazebo world file
@@ -135,7 +135,7 @@ Templates live in `templates/`. Python does simple string substitution (`$PLACEH
 
 ### Paths in templates are relative
 
-All `uri` fields use relative paths (`terrain_data/height_map.tif`, `terrain_data/aerial.png`, etc.).
+All `uri` fields use relative paths (`terrain_data/height_map.png`, `terrain_data/aerial.png`, etc.).
 Gazebo resolves these relative to the world file's directory. This makes the output portable —
 zip and extract anywhere, then run directly.
 
@@ -187,7 +187,7 @@ scripts/
     param.py                   — Global constants (MAPBOX_API_KEY, TEMPLATE_DIR_PATH, DEM_BUILDING_RESOLUTION)
     demTilesDownloader.py      — Downloads Mapbox DEM tiles as flat [zoom,y,x].png
     gazeboWorldGenerator.py    — OrthoGenerator, GazeboTerrainGenerator; main pipeline entry point
-    heightMapGenerator.py      — Stitches DEM tiles, generates height_map.tif; get_amsl()
+    heightMapGenerator.py      — Stitches DEM tiles, generates height_map.png (16-bit); get_amsl()
     fileWriter.py              — read_template(), write_world_file(); no SDF logic in Python
     buildingsGenerator.py      — GeoJSON → .dae conversion
     buildingDownloader.py      — OSM buildings GeoJSON downloader
@@ -200,7 +200,5 @@ scripts/
 templates/
   gazebo_world_template.sdf   — Full world file template
   building_template.sdf       — Buildings link fragment (conditional)
-  config_temp.txt             — DEAD: leftover from old gen_config() flow, to be deleted
-  sdf_temp.txt                — DEAD: leftover from old gen_sdf() flow, to be deleted
 scripts/UI/                   — OLD frontend (pre-refactor), superseded by scripts/frontend/
 ```

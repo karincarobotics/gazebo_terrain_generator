@@ -40,12 +40,13 @@
 
         <light type="directional" name="sun">
             <cast_shadows>true</cast_shadows>
-            <pose>0 0 1000 0 0 0</pose>
+            <pose>0 0 100 0 0 0</pose>
             <diffuse>0.9 0.88 0.82 1</diffuse>
             <!-- Zero specular prevents glint/reflection artifacts on terrain -->
             <specular>0 0 0 1</specular>
-            <!-- Realistic mid-afternoon sun: ~60° elevation from south-west -->
-            <direction>0.4 0.2 -0.9</direction>
+            <!-- gz-sim/OGRE2 bug: shadow map artifact appears when both X and Y are non-zero.
+                 Workaround: keep one horizontal component zero. Y-only = sun from north. -->
+            <direction>0.0 0.3 -0.8</direction>
         </light>
 
         <scene>
@@ -148,7 +149,7 @@ $BUILDING$
 
         <!-- Simple sphere model at origin used for debugging-->
         <model name="sphere">
-            <pose>0 0 400 0 0 0</pose>
+            <pose>0 0 10 0 0 0</pose>
             <static>false</static>
             <link name="sphere_link">
                 <inertial>
@@ -162,7 +163,7 @@ $BUILDING$
                 <collision name="sphere_collision">
                     <geometry>
                         <sphere>
-                            <radius>5</radius>
+                            <radius>0.5</radius>
                         </sphere>
                     </geometry>
                     <surface>
@@ -181,7 +182,7 @@ $BUILDING$
                 <visual name="sphere_visual">
                     <geometry>
                         <sphere>
-                            <radius>5</radius>
+                            <radius>0.5</radius>
                         </sphere>
                     </geometry>
                     <material>

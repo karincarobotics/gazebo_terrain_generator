@@ -1,9 +1,7 @@
 import os
 import cv2
-import shutil
 import json
 import numpy as np
-import argparse
 from utils.fileWriter import FileWriter
 from utils.param import globalParam
 from utils.maptileUtils import maptile_utiles
@@ -11,10 +9,7 @@ from utils.buildingsGenerator import GeoJSONToDAE
 from utils.heightMapGenerator import HeightmapGenerator
 from utils.utils import ConcatImage
 from geopy.distance import geodesic
-from geopy.distance import distance
 from geopy.point import Point
-from PIL import Image
-import rasterio
 
 
 class OrthoGenerator(ConcatImage):
@@ -39,43 +34,19 @@ class OrthoGenerator(ConcatImage):
         output_dir = os.path.join(tile_path, 'terrain_data')
         os.makedirs(output_dir, exist_ok=True)
 
-        # Parse flat tile filenames: [zoom,y,x].png → build lookup dict
-        tile_map = {}  # (x, y) → path
-        for fname in os.listdir(tiles_dir):
-            if not fname.endswith('.png'):
-                continue
-            parts = fname[1:-5].split(',')  # strip '[' and '].png'
-            z, y, x = int(parts[0]), int(parts[1]), int(parts[2])
-            if z != zoom_level:
-                continue
-            tile_map[(x, y)] = os.path.join(tiles_dir, fname)
-
-        if not tile_map:
+        # Get tile size from the first available tile to build the gray fill
+        sample_fname = next((f for f in os.listdir(tiles_dir) if f.endswith('.png')), None)
+        if sample_fname is None:
             raise ValueError(f"No tiles found in {tiles_dir} for zoom level {zoom_level}")
-
-        x_min = min(x for x, y in tile_map)
-        x_max = max(x for x, y in tile_map)
-        y_min = min(y for x, y in tile_map)
-        y_max = max(y for x, y in tile_map)
-
-        # Get tile size from the first available tile, create gray fill for missing tiles
-        sample_img = cv2.imread(next(iter(tile_map.values())))
+        sample_img = cv2.imread(os.path.join(tiles_dir, sample_fname))
         tile_h, tile_w = sample_img.shape[:2]
         gray_tile = np.full((tile_h, tile_w, 3), 128, dtype=np.uint8)
 
-        # Build full bounding rectangle west→east, north→south; fill gaps with gray
-        column_images = []
-        for x in range(x_min, x_max + 1):
-            rows = []
-            for y in range(y_min, y_max + 1):
-                if (x, y) in tile_map:
-                    img = cv2.imread(tile_map[(x, y)])
-                    rows.append(img if img is not None else gray_tile)
-                else:
-                    rows.append(gray_tile)
-            column_images.append(cv2.vconcat(rows))
-
-        stitched_image = cv2.hconcat(column_images)
+        stitched_image, tile_map, x_min, x_max, y_min, y_max = self.stitch_flat_tiles(
+            tiles_dir, zoom_level, missing_fill=gray_tile
+        )
+        if tile_map is None or len(tile_map) == 0:
+            raise ValueError(f"No tiles found in {tiles_dir} for zoom level {zoom_level}")
 
         # gz-sim normalizes texture UV by size_x for both axes, so a non-square image
         # causes the shorter dimension to be cut off. Pad to square with gray so all

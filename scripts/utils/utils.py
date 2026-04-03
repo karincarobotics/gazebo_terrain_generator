@@ -5,6 +5,7 @@ import urllib.error
 import urllib.request
 
 import cv2
+import numpy as np
 
 
 class Utils:
@@ -50,63 +51,58 @@ class ConcatImage:
         super().__init__(**kwargs)
 
     @staticmethod
-    def get_x_tile_directories(image_dir: str, tile_boundaries: dict) -> list:
+    def stitch_flat_tiles(tiles_dir: str, zoom_level: int, missing_fill=None):
         """
-        Get a numerically sorted list of X-tile directories within tile boundary limits.
+        Stitch flat tile files ([zoom,y,x].png) from tiles_dir into a single image.
+
+        Tiles at zoom levels other than zoom_level are ignored.
+        Missing tiles within the bounding rectangle are filled with missing_fill
+        (a pre-built numpy array matching one tile's shape), or omitted if None.
 
         Args:
-            image_dir (str): Path to the zoom level directory containing X-tile directories.
-            tile_boundaries (dict): Dictionary of tile coordinate bounds.
+            tiles_dir (str): Directory containing flat [zoom,y,x].png tile files.
+            zoom_level (int): Zoom level to filter tiles by.
+            missing_fill: Optional numpy array used to fill gaps (e.g. gray tile).
 
         Returns:
-            list: Sorted list of valid X-tile directory names (as strings).
+            tuple: (stitched_image, tile_map, x_min, x_max, y_min, y_max)
+                   stitched_image — cv2 numpy array of the combined image
+                   tile_map       — dict mapping (x, y) → file path
+                   x/y min/max    — bounding tile coordinate extents
         """
-        dir_list = [d for d in os.listdir(image_dir) if d.isdigit()]
-        min_x = min(tile_boundaries["southwest"][0], tile_boundaries["southeast"][0])
-        max_x = max(tile_boundaries["southwest"][0], tile_boundaries["southeast"][0])
-        x_dirs = sorted([d for d in dir_list if min_x <= int(d) <= max_x], key=lambda x: int(x))
-        return x_dirs
+        tile_map = {}
+        for fname in os.listdir(tiles_dir):
+            if not fname.endswith('.png'):
+                continue
+            parts = fname[1:-5].split(',')  # strip '[' and '].png'
+            z, y, x = int(parts[0]), int(parts[1]), int(parts[2])
+            if zoom_level is not None and z != zoom_level:
+                continue
+            tile_map[(x, y)] = os.path.join(tiles_dir, fname)
 
-    @staticmethod
-    def process_column_image(dir_name, image_dir, tile_boundaries, temp_output_dir):
-        image_list = []
-        max_y = max(tile_boundaries["northwest"][1], tile_boundaries["southwest"][1])
-        min_y = min(tile_boundaries["northwest"][1], tile_boundaries["southwest"][1])
+        x_min = min(x for x, y in tile_map)
+        x_max = max(x for x, y in tile_map)
+        y_min = min(y for x, y in tile_map)
+        y_max = max(y for x, y in tile_map)
 
-        dir_path = os.path.join(image_dir, dir_name)
-        for image in os.listdir(dir_path):
-            tile_num = int(image.split('.')[0])
-            if min_y <= tile_num <= max_y:
-                image_list.append(os.path.join(dir_path, image))
+        if missing_fill is not None:
+            column_images = []
+            for x in range(x_min, x_max + 1):
+                rows = []
+                for y in range(y_min, y_max + 1):
+                    if (x, y) in tile_map:
+                        img = cv2.imread(tile_map[(x, y)])
+                        rows.append(img if img is not None else missing_fill)
+                    else:
+                        rows.append(missing_fill)
+                column_images.append(cv2.vconcat(rows))
+        else:
+            column_images = []
+            for x in range(x_min, x_max + 1):
+                rows = [cv2.imread(tile_map[(x, y)]) for y in range(y_min, y_max + 1) if (x, y) in tile_map]
+                rows = [img for img in rows if img is not None]
+                if rows:
+                    column_images.append(cv2.vconcat(rows))
 
-        image_list.sort()
-        images = [cv2.imread(path) for path in image_list if os.path.exists(path)]
-        if images:
-            output_file = os.path.join(temp_output_dir, dir_name + '.png')
-            cv2.imwrite(output_file, cv2.vconcat(images))
-
-    @staticmethod
-    def _run_instance_method(args: tuple) -> None:
-        """
-        Run an instance method with the provided arguments.
-        Args:
-            args (tuple): A tuple containing the instance and its method arguments.
-        Returns:
-            None
-        """
-        instance, dir_name, image_dir, tile_boundaries, temp_output_dir = args
-        instance.process_column_image(dir_name, image_dir, tile_boundaries, temp_output_dir)
-
-    @staticmethod
-    def are_dimensions_equal(img1, img2) -> bool:
-        """
-        Check if dimensions of two images are equal.
-
-        Args:
-            img1: First image.
-            img2: Second image.
-
-        Returns:
-            bool: True if dimensions are equal, False otherwise.
-        """
-        return img1.shape[:2] == img2.shape[:2]
+        stitched_image = cv2.hconcat(column_images)
+        return stitched_image, tile_map, x_min, x_max, y_min, y_max

@@ -45,7 +45,8 @@ class FileWriter:
         Returns:
             None
         '''
-        if include_buildings:
+        dae_file = os.path.join(output_dir, 'terrain_data', 'buildings.dae')
+        if include_buildings and os.path.isfile(dae_file):
             building_template = FileWriter.read_template(
                 os.path.join(globalParam.TEMPLATE_DIR_PATH, 'building_template.sdf')
             )
@@ -66,8 +67,18 @@ class FileWriter:
         sdf_template = sdf_template.replace("$ORIGIN_LAT$", str(launch_lat))
         sdf_template = sdf_template.replace("$ORIGIN_LONG$", str(launch_lon))
         sdf_template = sdf_template.replace("$ORIGIN_ELEVATION$", str(origin_elevation))
+        if globalParam.DEBUG_SPHERE:
+            debug_sphere_block = FileWriter.read_template(
+                os.path.join(globalParam.TEMPLATE_DIR_PATH, 'debug_sphere_template.sdf')
+            )
+        else:
+            debug_sphere_block = ""
+
         sdf_template = sdf_template.replace("$BUILDING$", buildings_sdf_block)
+        sdf_template = sdf_template.replace("$DEBUG_SPHERE$", debug_sphere_block)
         sdf_template = sdf_template.replace("$TEXTURE_SIZE$", str(texture_size if texture_size is not None else max(size_x, size_y)))
+        camera_z = round(size_z + pose_z + 200, 1)  # terrain peak in world frame + 200m clearance
+        sdf_template = sdf_template.replace("$CAMERA_Z$", str(camera_z))
 
         os.makedirs(output_dir, exist_ok=True)
         with open(os.path.join(output_dir, model_name + ".world"), "w") as f:

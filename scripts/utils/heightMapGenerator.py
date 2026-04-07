@@ -132,11 +132,16 @@ class HeightmapGenerator(ConcatImage):
         # Keep PIL image in memory for pixel lookups (mode 'I' stores uint16 values as int32)
         self.heightmap = Image.fromarray(resized_map.astype(np.int32), mode='I')
 
-        normal_map = HeightmapGenerator.generate_normal_map(resized_map)
+        # Scale normal map strength proportionally to terrain range:
+        # the heightmap is always normalized to 0-65535 regardless of real-world range,
+        # so Sobel gradients are proportionally much stronger on flat terrain.
+        # Dividing by a 100m reference keeps strength consistent across terrain types.
+        terrain_range = self.max_height - self.min_height
+        normal_map = HeightmapGenerator.generate_normal_map(resized_map, strength=0.0002 * (terrain_range / 100.0))
         cv2.imwrite(os.path.join(terrain_data_dir, 'normal_map.png'), normal_map)
 
     @staticmethod
-    def generate_normal_map(heightmap_u16: np.ndarray, strength: float = 0.001) -> np.ndarray:
+    def generate_normal_map(heightmap_u16: np.ndarray, strength: float) -> np.ndarray:
         """
         Derive a tangent-space normal map from a 16-bit heightmap using Sobel gradients.
 
@@ -145,7 +150,8 @@ class HeightmapGenerator(ConcatImage):
 
         Args:
             heightmap_u16: uint16 grayscale heightmap array (values 0-65535).
-            strength: Gradient multiplier — higher values exaggerate terrain relief.
+            strength: Gradient multiplier — scale by (terrain_range / 100.0) before passing
+                      so the output is consistent across flat and hilly terrain.
 
         Returns:
             uint8 BGR normal map array, same spatial dimensions as input.

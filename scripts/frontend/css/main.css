@@ -490,6 +490,34 @@ main {
     color: white;
 }
 
+.console-download-btn {
+    background: rgba(59, 178, 208, 0.1);
+    border: 1px solid rgba(59, 178, 208, 0.3);
+    color: #3bb2d0;
+    padding: 8px 20px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+    margin-right: 8px;
+}
+
+.console-download-btn:hover {
+    background: rgba(59, 178, 208, 0.2);
+}
+
+.console-intermediary-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.5);
+    margin-right: 12px;
+    cursor: pointer;
+    user-select: none;
+}
+
 /* Settings panel */
 .settings-panel {
     position: absolute;

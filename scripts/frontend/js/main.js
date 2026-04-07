@@ -798,12 +798,12 @@
             return;
         }
 
-        pollGenerationStatus();
+        pollGenerationStatus(modelName);
     }
 
     let lastProgressMessage = '';
 
-    async function pollGenerationStatus() {
+    async function pollGenerationStatus(mapName) {
         if (generationCancelled) return;
         try {
             const resp = await fetch('/task-status');
@@ -814,7 +814,7 @@
             if (status === 'completed') {
                 if (msg && msg !== lastProgressMessage) logToConsole(msg, 'success');
                 setConsoleStatus('completed');
-                setConsoleCloseMode();
+                setConsoleCloseMode(mapName);
             } else if (status === 'failed') {
                 if (msg && msg !== lastProgressMessage) logToConsole(msg, 'error');
                 setConsoleStatus('failed');
@@ -824,11 +824,11 @@
                     logToConsole(msg);
                     lastProgressMessage = msg;
                 }
-                pollingTimer = setTimeout(pollGenerationStatus, 1000);
+                pollingTimer = setTimeout(() => pollGenerationStatus(mapName), 1000);
             }
         } catch (e) {
             logToConsole('Error polling status: ' + e.message, 'error');
-            pollingTimer = setTimeout(pollGenerationStatus, 5000);
+            pollingTimer = setTimeout(() => pollGenerationStatus(mapName), 5000);
         }
     }
 
@@ -875,6 +875,9 @@
         document.getElementById('console-progress-label').textContent = '0 / 0 tiles';
         document.getElementById('console-status-badge').className = 'console-status-badge';
         document.getElementById('console-status-badge').textContent = 'Running';
+        document.getElementById('console-download-btn').style.display = 'none';
+        document.getElementById('console-intermediary-wrap').style.display = 'none';
+        document.getElementById('console-intermediary-chk').checked = false;
         const stopBtn = document.getElementById('console-stop-btn');
         stopBtn.className = 'console-stop-btn';
         stopBtn.innerHTML = '<i class="fas fa-stop"></i> Stop';
@@ -910,13 +913,28 @@
         badge.textContent = labels[status] || status;
     }
 
-    function setConsoleCloseMode() {
+    function setConsoleCloseMode(mapName) {
         const btn = document.getElementById('console-stop-btn');
         btn.className = 'console-stop-btn close';
         btn.innerHTML = '<i class="fas fa-times"></i> Close';
         btn.onclick = function () {
             document.getElementById('console-overlay').classList.remove('open');
         };
+
+        const dlBtn = document.getElementById('console-download-btn');
+        const dlWrap = document.getElementById('console-intermediary-wrap');
+        if (mapName) {
+            dlWrap.style.display = '';
+            dlBtn.style.display = '';
+            dlBtn.onclick = function () {
+                const includeIntermediary = document.getElementById('console-intermediary-chk').checked;
+                window.location.href = '/download-world?mapName=' + encodeURIComponent(mapName)
+                    + '&includeIntermediary=' + includeIntermediary;
+            };
+        } else {
+            dlWrap.style.display = 'none';
+            dlBtn.style.display = 'none';
+        }
     }
 
     // Setup settings panel

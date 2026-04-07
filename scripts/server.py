@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, send_file
 import threading
 import os
 import uuid
@@ -181,6 +181,39 @@ def end_download():
 	thread.start()
 
 	return jsonify({"code": 200, "message": "Download ended"})
+
+
+@app.route('/download-world', methods=['GET'])
+def download_world():
+	map_name = request.args.get('mapName', '')
+	if not map_name:
+		return jsonify({"code": 400, "message": "mapName required"}), 400
+
+	map_dir = get_map_dir(map_name)
+	world_file = os.path.join(map_dir, f"{map_name}.world")
+	terrain_data_dir = os.path.join(map_dir, 'terrain_data')
+
+	if not os.path.isfile(world_file):
+		return jsonify({"code": 404, "message": "World file not found"}), 404
+
+	include_intermediary = request.args.get('includeIntermediary', 'false').lower() == 'true'
+
+	zip_path = os.path.join(map_dir, f"{map_name}.zip")
+	import zipfile
+	with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+		zf.write(world_file, f"{map_name}/{map_name}.world")
+		zf.write(os.path.join(map_dir, 'metadata.json'), f"{map_name}/metadata.json")
+		if os.path.isdir(terrain_data_dir):
+			for fname in os.listdir(terrain_data_dir):
+				zf.write(os.path.join(terrain_data_dir, fname), f"{map_name}/terrain_data/{fname}")
+		if include_intermediary:
+			for subdir in ('tiles', 'dem', 'building_tiles'):
+				subdir_path = os.path.join(map_dir, subdir)
+				if os.path.isdir(subdir_path):
+					for fname in os.listdir(subdir_path):
+						zf.write(os.path.join(subdir_path, fname), f"{map_name}/{subdir}/{fname}")
+
+	return send_file(zip_path, mimetype='application/zip', as_attachment=True, download_name=f"{map_name}.zip")
 
 
 @app.route('/', defaults={'path': 'index.html'})

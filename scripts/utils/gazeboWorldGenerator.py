@@ -84,16 +84,6 @@ class OrthoGenerator(ConcatImage):
         compression_params = [cv2.IMWRITE_PNG_COMPRESSION, 9]
         cv2.imwrite(os.path.join(output_dir, 'aerial.png'), stitched_image, compression_params)
 
-        # Flat normal map: RGB(128,128,255) = normal pointing straight up.
-        # Stored as BGR for OpenCV: B=255, G=128, R=128.
-        # Placeholder until a proper normal map is derived from the heightmap.
-        h, w = stitched_image.shape[:2]
-        flat_normal = np.empty((h, w, 3), dtype=np.uint8)
-        flat_normal[:, :, 0] = 255  # B → Z (up)
-        flat_normal[:, :, 1] = 128  # G → Y (neutral)
-        flat_normal[:, :, 2] = 128  # R → X (neutral)
-        cv2.imwrite(os.path.join(output_dir, 'flat_normal.png'), flat_normal, compression_params)
-
 
 
 class GazeboTerrianGenerator(HeightmapGenerator,OrthoGenerator):

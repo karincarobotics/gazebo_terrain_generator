@@ -40,13 +40,13 @@
 
         <light type="directional" name="sun">
             <cast_shadows>true</cast_shadows>
-            <pose>0 0 100 0 0 0</pose>
+            <pose>0 -7000 7000 0 0 0</pose>
             <diffuse>0.9 0.88 0.82 1</diffuse>
             <!-- Zero specular prevents glint/reflection artifacts on terrain -->
             <specular>0 0 0 1</specular>
             <!-- gz-sim/OGRE2 bug: shadow map artifact appears when both X and Y are non-zero.
                  Workaround: keep one horizontal component zero. Y-only = sun from north. -->
-            <direction>0.0 0.3 -0.8</direction>
+            <direction>0.0 0.6 -0.6</direction>
         </light>
 
         <scene>
@@ -128,9 +128,7 @@
                             <use_terrain_paging>false</use_terrain_paging>
                             <texture>
                                 <diffuse>terrain_data/aerial.png</diffuse>
-                                <!-- Flat normal map (128,128,255): normals point straight up, no artifacts.
-                                     TODO: replace with a proper normal map derived from the heightmap. -->
-                                <normal>terrain_data/flat_normal.png</normal>
+                                    <normal>terrain_data/normal_map.png</normal>
                                 <size>$TEXTURE_SIZE$</size>
                             </texture>
                             <uri>terrain_data/height_map.png</uri>

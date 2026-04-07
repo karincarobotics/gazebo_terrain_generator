@@ -114,7 +114,15 @@ class HeightmapGenerator(ConcatImage):
         upscale_factor = 2 ** (zoomlevel - dem_resolution)
         target = min(max(height, width) * upscale_factor, globalParam.MAX_HEIGHTMAP_SIZE)
         size = HeightmapGenerator.get_nearest_map_size(int(target), int(target))
-        resized_map = cv2.resize(height_img_normalized, (size, size), interpolation=cv2.INTER_CUBIC)
+        # INTER_LINEAR avoids ringing artifacts that INTER_CUBIC introduces around
+        # sharp SRTM quantization steps (~1m vertical steps on steep slopes)
+        resized_map = cv2.resize(height_img_normalized, (size, size), interpolation=cv2.INTER_LINEAR)
+
+        # Smooth out SRTM quantization steps. Source DEM is ~30m ground resolution so
+        # smoothing by ~3 source pixels (scaled to heightmap size) removes quantization
+        # stripes without losing real terrain shape.
+        smooth_kernel = max(3, (size // 1000) * 2 + 1)  # ~31px for 4097, ~15px for 2049, always odd
+        resized_map = cv2.GaussianBlur(resized_map, (smooth_kernel, smooth_kernel), sigmaX=0)
 
         terrain_data_dir = os.path.join(tile_path, 'terrain_data')
         os.makedirs(terrain_data_dir, exist_ok=True)
@@ -123,6 +131,54 @@ class HeightmapGenerator(ConcatImage):
         cv2.imwrite(os.path.join(terrain_data_dir, 'height_map.png'), resized_map)
         # Keep PIL image in memory for pixel lookups (mode 'I' stores uint16 values as int32)
         self.heightmap = Image.fromarray(resized_map.astype(np.int32), mode='I')
+
+        normal_map = HeightmapGenerator.generate_normal_map(resized_map)
+        cv2.imwrite(os.path.join(terrain_data_dir, 'normal_map.png'), normal_map)
+
+    @staticmethod
+    def generate_normal_map(heightmap_u16: np.ndarray, strength: float = 0.001) -> np.ndarray:
+        """
+        Derive a tangent-space normal map from a 16-bit heightmap using Sobel gradients.
+
+        Normal encoding convention: RGB(128, 128, 255) = flat surface pointing straight up.
+        Stored as BGR for OpenCV.
+
+        Args:
+            heightmap_u16: uint16 grayscale heightmap array (values 0-65535).
+            strength: Gradient multiplier — higher values exaggerate terrain relief.
+
+        Returns:
+            uint8 BGR normal map array, same spatial dimensions as input.
+        """
+        # Run Sobel on raw uint16 values — avoids near-zero gradients that result
+        # from normalizing to [0,1] before differencing (pixel-to-pixel changes become tiny)
+        h = heightmap_u16.astype(np.float32)
+
+        # Blur before Sobel to suppress DEM quantization artifacts (SRTM ~1m steps appear
+        # as horizontal/vertical stripes when Sobel runs at full strength on raw data)
+        h = cv2.GaussianBlur(h, (9, 9), sigmaX=2.0)
+
+        # Sobel gradients — rate of height change per pixel in X and Y
+        dz_dx = cv2.Sobel(h, cv2.CV_32F, 1, 0, ksize=3)
+        dz_dy = cv2.Sobel(h, cv2.CV_32F, 0, 1, ksize=3)
+
+        # Normal = normalize(-dz/dx, -dz/dy, 1) — negated so normal tilts away from rising slope
+        nx = -dz_dx * strength
+        ny = -dz_dy * strength
+        nz = np.ones_like(nx)
+
+        length = np.sqrt(nx ** 2 + ny ** 2 + nz ** 2)
+        nx /= length
+        ny /= length
+        nz /= length
+
+        # Map [-1, 1] → [0, 255]; store as BGR (B=Z, G=Y, R=X)
+        normal_bgr = np.empty((*h.shape, 3), dtype=np.uint8)
+        normal_bgr[:, :, 2] = np.clip((nx * 0.5 + 0.5) * 255, 0, 255).astype(np.uint8)  # R → X
+        normal_bgr[:, :, 1] = np.clip((ny * 0.5 + 0.5) * 255, 0, 255).astype(np.uint8)  # G → Y
+        normal_bgr[:, :, 0] = np.clip((nz * 0.5 + 0.5) * 255, 0, 255).astype(np.uint8)  # B → Z
+
+        return normal_bgr
 
     def crop_dem_image(self, px_bound, height_map):
         cropped_image = height_map[px_bound["northwest"][1]:px_bound["southeast"][1],

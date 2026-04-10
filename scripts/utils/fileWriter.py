@@ -1,5 +1,8 @@
 import os
+from pathlib import Path
 from utils.param import globalParam
+
+TEMPLATE_DIR = str(Path(__file__).resolve().parents[2] / 'templates')
 
 
 class FileWriter:
@@ -48,7 +51,7 @@ class FileWriter:
         dae_file = os.path.join(output_dir, 'terrain_data', 'buildings.dae')
         if include_buildings and os.path.isfile(dae_file):
             building_template = FileWriter.read_template(
-                os.path.join(globalParam.TEMPLATE_DIR_PATH, 'building_template.sdf')
+                os.path.join(TEMPLATE_DIR, 'building_template.sdf')
             )
             buildings_sdf_block = (building_template
                 .replace("$MODELNAME$", model_name)
@@ -69,7 +72,7 @@ class FileWriter:
         sdf_template = sdf_template.replace("$ORIGIN_ELEVATION$", str(origin_elevation))
         if globalParam.DEBUG_SPHERE:
             debug_sphere_block = FileWriter.read_template(
-                os.path.join(globalParam.TEMPLATE_DIR_PATH, 'debug_sphere_template.sdf')
+                os.path.join(TEMPLATE_DIR, 'debug_sphere_template.sdf')
             )
         else:
             debug_sphere_block = ""

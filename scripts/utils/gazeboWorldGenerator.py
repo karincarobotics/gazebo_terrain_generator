@@ -2,7 +2,7 @@ import os
 import cv2
 import json
 import numpy as np
-from utils.fileWriter import FileWriter
+from utils.fileWriter import FileWriter, TEMPLATE_DIR
 from utils.param import globalParam
 from utils.maptileUtils import maptile_utiles
 from utils.buildingsGenerator import GeoJSONToDAE
@@ -169,7 +169,7 @@ class GazeboTerrianGenerator(HeightmapGenerator,OrthoGenerator):
         Returns:
             None
         """
-        template = FileWriter.read_template(os.path.join(globalParam.TEMPLATE_DIR_PATH, 'gazebo_world_template.sdf'))
+        template = FileWriter.read_template(os.path.join(TEMPLATE_DIR, 'gazebo_world_template.sdf'))
         launch_cord = self.get_launch_location()
         FileWriter.write_world_file(
             template,

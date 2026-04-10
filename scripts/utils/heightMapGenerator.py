@@ -7,6 +7,11 @@ from utils.maptileUtils import maptile_utiles
 from utils.utils import ConcatImage
 
 
+# Gazebo heightmap size must be 2^n+1. Zoom 17+ always exceeds this cap via the
+# DEM→satellite upscale factor, so this is the practical output ceiling.
+MAX_HEIGHTMAP_SIZE = 4097
+
+
 class HeightmapGenerator(ConcatImage):
     def __init__(self,**kwargs):
         super().__init__(**kwargs)
@@ -110,9 +115,8 @@ class HeightmapGenerator(ConcatImage):
         # 16-bit encoding: 65535 levels vs 255 → ~0.008m precision for 534m range (vs 2.1m for 8-bit)
         height_img_normalized = ((height_map - np.min(height_map)) / (np.max(height_map) - np.min(height_map)) * 65535).astype(np.uint16)
 
-        from utils.param import globalParam
         upscale_factor = 2 ** (zoomlevel - dem_resolution)
-        target = min(max(height, width) * upscale_factor, globalParam.MAX_HEIGHTMAP_SIZE)
+        target = min(max(height, width) * upscale_factor, MAX_HEIGHTMAP_SIZE)
         size = HeightmapGenerator.get_nearest_map_size(int(target), int(target))
         # INTER_LINEAR avoids ringing artifacts that INTER_CUBIC introduces around
         # sharp SRTM quantization steps (~1m vertical steps on steep slopes)

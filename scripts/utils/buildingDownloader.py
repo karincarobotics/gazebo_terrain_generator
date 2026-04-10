@@ -26,7 +26,7 @@ class BuildingDownloader:
         """
 
     @staticmethod
-    def download_tile(zoom : int, x: int, y: int, output_dir: str) -> Dict[str, Any]:
+    def download_tile(zoom : int, x: int, y: int, output_dir: str, api_key: str) -> Dict[str, Any]:
         """
         Download a single vector tile containing building data and convert to GeoJSON.
 
@@ -34,13 +34,14 @@ class BuildingDownloader:
             x: Tile X coordinate
             y: Tile Y coordinate
             z: Zoom level
+            api_key: Mapbox API key.
 
         Returns:
             GeoJSON FeatureCollection with building polygons
         """
         base_url = "https://api.mapbox.com/v4/mapbox.mapbox-streets-v8"
 
-        url = f"{base_url}/{zoom}/{x}/{y}.vector.pbf?access_token={globalParam.MAPBOX_API_KEY}"
+        url = f"{base_url}/{zoom}/{x}/{y}.vector.pbf?access_token={api_key}"
 
         try:
             response = requests.get(url, timeout=30)
@@ -142,6 +143,7 @@ class BuildingDownloader:
     def download_buildings(
         self,
         bound_array: Dict[str, Any],
+        api_key: str = None,
         zoom: int = globalParam.DEM_BUILDING_RESOLUTION,
         output_directory: str = None,
         polygon_vertices: list = None  # [[lng, lat], ...] drawn polygon from frontend
@@ -186,7 +188,7 @@ class BuildingDownloader:
             for y in range(tiley_start, tiley_end + 1):
                 tile_path = os.path.join(x_dir, f"{y}.json")
                 if not os.path.isfile(tile_path):
-                    tasks.append((zoom, x, y, x_dir))
+                    tasks.append((zoom, x, y, x_dir, api_key))
 
         # ---- Download missing tiles ----
         if tasks:
@@ -359,7 +361,7 @@ class BuildingDownloader:
 
 
 
-def download_streetmap_data(bound_array, output_directory, model_path, zoom_level: int = globalParam.DEM_BUILDING_RESOLUTION, polygon_vertices: list = None):
+def download_streetmap_data(bound_array, output_directory, model_path, api_key: str = None, zoom_level: int = globalParam.DEM_BUILDING_RESOLUTION, polygon_vertices: list = None):
     #try:
     downloader = BuildingDownloader()
 
@@ -369,6 +371,7 @@ def download_streetmap_data(bound_array, output_directory, model_path, zoom_leve
     )
     buildings_geojson = downloader.download_buildings(
         bound_array=bound_array,
+        api_key=api_key,
         zoom=zoom_level,
         output_directory=output_directory,
         polygon_vertices=polygon_vertices

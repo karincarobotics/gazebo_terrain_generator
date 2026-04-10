@@ -15,7 +15,6 @@ from utils.utils import Utils
 from utils.gazeboWorldGenerator import GazeboTerrianGenerator
 from utils.maptileUtils import maptile_utiles
 from utils.param import globalParam
-import requests
 
 app = Flask(__name__)
 lock = threading.Lock()
@@ -38,7 +37,7 @@ def bounds_from_polygon(vertices):
 	return [min(lngs), min(lats), max(lngs), max(lats)]
 
 
-def process_end_download(map_name, bounds, zoom_level, dem_resolution, include_buildings, polygon_vertices):
+def process_end_download(map_name, bounds, zoom_level, dem_resolution, include_buildings, polygon_vertices, api_key):
 	global task_status
 
 	def progress(msg):
@@ -53,11 +52,11 @@ def process_end_download(map_name, bounds, zoom_level, dem_resolution, include_b
 
 		progress("Downloading elevation data (DEM)...")
 		dem_path = os.path.join(map_dir, 'dem')
-		download_dem_data(true_boundaries, dem_path, dem_resolution)
+		download_dem_data(true_boundaries, dem_path, dem_resolution, api_key)
 
 		if include_buildings:
 			progress("Downloading building footprint data...")
-			download_streetmap_data(true_boundaries, os.path.join(map_dir, 'building_tiles'), os.path.join(map_dir, 'terrain_data'), polygon_vertices=polygon_vertices)
+			download_streetmap_data(true_boundaries, os.path.join(map_dir, 'building_tiles'), os.path.join(map_dir, 'terrain_data'), api_key=api_key, polygon_vertices=polygon_vertices)
 
 		terrian_generator = GazeboTerrianGenerator(map_dir, include_buildings)
 		terrian_generator.generate_gazebo_world(progress_cb=progress)
@@ -70,35 +69,6 @@ def process_end_download(map_name, bounds, zoom_level, dem_resolution, include_b
 		task_status["message"] = f"Error: {e}"
 		print(f"Error during processing: {e}")
 
-
-def validate_mapbox_key(api_key):
-	try:
-		url = f"https://api.mapbox.com/styles/v1/mapbox/streets-v11/static/0,0,1/1x1?access_token={api_key}"
-		response = requests.get(url, timeout=5)
-		if response.status_code == 200:
-			print("Mapbox API key is validated successfully.")
-			return True
-		elif response.status_code == 401:
-			print("Invalid Mapbox API key.")
-			return False
-		else:
-			print(f"Unexpected response: {response.status_code}")
-			print(response.text)
-			return False
-	except requests.exceptions.ConnectionError:
-		print("Cannot validate Mapbox API key - no internet connection.")
-		return False
-	except requests.exceptions.Timeout:
-		print("Mapbox API validation timed out.")
-		return False
-	except Exception as e:
-		print(f"Error validating Mapbox API key: {e}")
-		return False
-
-
-@app.route('/api/mapbox-key', methods=['GET'])
-def get_mapbox_key():
-	return jsonify({"code": 200, "apiKey": globalParam.MAPBOX_API_KEY})
 
 
 @app.route('/task-status', methods=['GET'])
@@ -175,9 +145,10 @@ def end_download():
 	polygon_vertices = json.loads(postvars['polygonVertices'])
 	bounds = bounds_from_polygon(polygon_vertices)
 	include_buildings = postvars.get('includeBuildings', 'false').lower() == 'true'
+	api_key = postvars.get('mapboxApiKey', '')
 	dem_resolution = min(zoom_level, 13)
 
-	thread = threading.Thread(target=process_end_download, args=(map_name, bounds, zoom_level, dem_resolution, include_buildings, polygon_vertices))
+	thread = threading.Thread(target=process_end_download, args=(map_name, bounds, zoom_level, dem_resolution, include_buildings, polygon_vertices, api_key))
 	thread.start()
 
 	return jsonify({"code": 200, "message": "Download ended"})
@@ -234,7 +205,5 @@ def serve_static_old(path):
 
 
 if __name__ == '__main__':
-	if not validate_mapbox_key(globalParam.MAPBOX_API_KEY):
-		exit(1)
 	print("Starting Flask server...")
 	app.run(host='127.0.0.1', port=8080, threaded=True)

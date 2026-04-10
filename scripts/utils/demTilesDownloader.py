@@ -60,7 +60,7 @@ def download_tile_image(args: tuple) -> None:
         print(f"[WARN] Skipped tile ({x}, {y}) due to download error.")
 
 
-def download_dem_data(bound_array, output_directory, zoom: int) -> None:
+def download_dem_data(bound_array, output_directory, zoom: int, api_key: str) -> None:
     """
     Download DEM data for a specified bounding box at a given zoom level.
     Args:
@@ -69,6 +69,7 @@ def download_dem_data(bound_array, output_directory, zoom: int) -> None:
         zoom (int): Zoom level for DEM tiles. Should be min(satellite_zoom, 13) —
                     Mapbox terrain-dem-v1 source data is ~30m (SRTM), so zoom > 13
                     yields no additional real-world elevation detail.
+        api_key (str): Mapbox API key.
     Returns:
         None
     """
@@ -83,8 +84,6 @@ def download_dem_data(bound_array, output_directory, zoom: int) -> None:
 
         tilex_start, tilex_end = sorted((nw_tilex, se_tilex))
         tiley_start, tiley_end = sorted((nw_tiley, se_tiley))
-
-        api_key = globalParam.MAPBOX_API_KEY
         for x in range(tilex_start, tilex_end + 1):
             for y in range(tiley_start, tiley_end + 1):
                 dem_file = os.path.join(output_directory, f"[{zoom},{y},{x}].png")

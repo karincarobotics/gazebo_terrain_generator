@@ -316,6 +316,58 @@ main {
     border-color: rgba(59, 178, 208, 0.5);
 }
 
+.apikey-modal-input {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 6px;
+    color: white;
+    padding: 10px 12px;
+    font-size: 12px;
+    font-family: monospace;
+    outline: none;
+    box-sizing: border-box;
+    margin-bottom: 20px;
+    resize: vertical;
+    word-break: break-all;
+    transition: border-color 0.2s;
+}
+
+.apikey-modal-input:focus {
+    border-color: rgba(59, 178, 208, 0.5);
+}
+
+.apikey-modal-error {
+    color: #e74c3c;
+    font-size: 12px;
+    margin: -12px 0 16px;
+    text-align: center;
+}
+
+.mapbox-key-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 5px;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 12px;
+    padding: 5px 10px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.2s;
+}
+
+.mapbox-key-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.mapbox-key-btn.key-set {
+    color: #3bb2d0;
+    border-color: rgba(59, 178, 208, 0.3);
+}
+
 .name-modal-actions {
     display: flex;
     gap: 10px;

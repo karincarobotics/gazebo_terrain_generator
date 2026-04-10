@@ -71,43 +71,117 @@
         document.getElementById('setting-include-buildings').checked = config.includeBuildings;
         document.getElementById('setting-tile-source').value = config.tileSource;
         document.getElementById('setting-parallel-downloads').value = config.parallelDownloads;
+        updateMapboxKeyStatus(loadMapboxKey());
 
         const matchedSource = TILE_SOURCES.find(s => s && s.url === config.tileSource);
         document.getElementById('setting-source-display').textContent =
             matchedSource ? matchedSource.label : 'Custom';
     }
 
-    // Initialize the application
-    async function init() {
-        try {
-            // Fetch Mapbox API key from server
-            await fetchMapboxKey();
+    const MAPBOX_KEY_STORAGE_KEY = 'gazebo_terrain_generator_mapbox_key';
 
-            // Initialize the map
-            initializeMap();
+    function loadMapboxKey() {
+        return localStorage.getItem(MAPBOX_KEY_STORAGE_KEY) || '';
+    }
 
-            console.log('Application initialized successfully');
-        } catch (error) {
-            console.error('Failed to initialize application:', error);
-            showError('Failed to load the application. Please refresh the page.');
+    function saveMapboxKey(key) {
+        localStorage.setItem(MAPBOX_KEY_STORAGE_KEY, key);
+    }
+
+    function openApikeyModal(onSave) {
+        const overlay = document.getElementById('apikey-modal-overlay');
+        const input = document.getElementById('apikey-modal-input');
+        const errorEl = document.getElementById('apikey-modal-error');
+        const confirmBtn = document.getElementById('apikey-modal-confirm');
+        const cancelBtn = document.getElementById('apikey-modal-cancel');
+
+        const hasExistingKey = !!loadMapboxKey();
+        input.value = hasExistingKey ? loadMapboxKey() : '';
+        errorEl.style.display = 'none';
+        cancelBtn.style.display = hasExistingKey ? '' : 'none';
+
+        overlay.classList.add('open');
+        input.focus();
+
+        async function save() {
+            const key = input.value.trim();
+            if (!key) return;
+
+            confirmBtn.disabled = true;
+            confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Validating...';
+            errorEl.style.display = 'none';
+
+            try {
+                const resp = await fetch(
+                    `https://api.mapbox.com/styles/v1/mapbox/satellite-v9?access_token=${encodeURIComponent(key)}`
+                );
+                if (resp.status === 401) {
+                    throw new Error('Invalid API key — please check and try again.');
+                } else if (!resp.ok) {
+                    throw new Error(`Validation failed (HTTP ${resp.status}).`);
+                }
+                overlay.classList.remove('open');
+                saveMapboxKey(key);
+                updateMapboxKeyStatus(key);
+                if (onSave) onSave(key);
+            } catch (e) {
+                const msg = (e instanceof TypeError)
+                    ? 'Could not reach Mapbox API - check if your key is valid and make sure you are connected to internet.'
+                    : e.message;
+                errorEl.textContent = msg;
+                errorEl.style.display = 'block';
+            } finally {
+                confirmBtn.disabled = false;
+                confirmBtn.innerHTML = '<i class="fas fa-check"></i> Save';
+            }
+        }
+
+        function cancel() {
+            overlay.classList.remove('open');
+        }
+
+        confirmBtn.onclick = save;
+        cancelBtn.onclick = cancel;
+    }
+
+    function updateMapboxKeyStatus(key) {
+        const btn = document.getElementById('setting-mapbox-key-btn');
+        const status = document.getElementById('setting-mapbox-key-status');
+        if (key) {
+            status.textContent = 'Configured';
+            btn.classList.add('key-set');
+        } else {
+            status.textContent = 'Not set';
+            btn.classList.remove('key-set');
         }
     }
 
-    // Fetch Mapbox API key from server
-    async function fetchMapboxKey() {
-        try {
-            const response = await fetch('/api/mapbox-key');
-            const data = await response.json();
+    // Initialize the application
+    async function init() {
+        mapboxApiKey = loadMapboxKey();
+        updateMapboxKeyStatus(mapboxApiKey);
 
-            if (data.code === 200 && data.apiKey) {
-                mapboxApiKey = data.apiKey;
-                mapboxgl.accessToken = mapboxApiKey;
-            } else {
-                throw new Error('Invalid API key response');
+        if (mapboxApiKey) {
+            try {
+                const resp = await fetch(
+                    `https://api.mapbox.com/styles/v1/mapbox/satellite-v9?access_token=${encodeURIComponent(mapboxApiKey)}`
+                );
+                if (!resp.ok) mapboxApiKey = '';
+            } catch (e) {
+                mapboxApiKey = '';
             }
-        } catch (error) {
-            throw new Error('Failed to fetch Mapbox API key: ' + error.message);
         }
+
+        if (!mapboxApiKey) {
+            openApikeyModal(function (key) {
+                mapboxApiKey = key;
+                mapboxgl.accessToken = key;
+                initializeMap();
+            });
+            return;
+        }
+        mapboxgl.accessToken = mapboxApiKey;
+        initializeMap();
     }
 
     // Initialize Mapbox map
@@ -201,48 +275,53 @@
 
         if (searchButton && input) {
             searchButton.addEventListener('click', function () {
-                searchCoordinates();
+                searchLocation();
             });
 
             input.addEventListener('keypress', function (e) {
                 if (e.key === 'Enter') {
-                    searchCoordinates();
+                    searchLocation();
                 }
             });
         }
     }
 
-    // Search for coordinates
-    function searchCoordinates() {
+    // Search for coordinates or place name
+    async function searchLocation() {
         const input = document.getElementById('coordinate-input');
         const value = input.value.trim();
+        if (!value) return;
 
-        // Parse coordinates (format: lat, lng)
-        const coords = value.split(',').map(s => parseFloat(s.trim()));
+        // Try coordinate parse first (format: lat, lng)
+        const parts = value.split(',').map(s => parseFloat(s.trim()));
+        if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+            flyToLocation(parts[0], parts[1]);
+            return;
+        }
 
-        if (coords.length === 2 && !isNaN(coords[0]) && !isNaN(coords[1])) {
-            const lat = coords[0];
-            const lng = coords[1];
-
-            // Clear any drawn polygon
-            draw.deleteAll();
-            clearCoordinateOverlays();
-            setGridVisible(false);
-
-            // Move map to new location
-            map.flyTo({
-                center: [lng, lat],
-                zoom: 15
-            });
-
-            // Move marker to new location
-            if (centerMarker) {
-                centerMarker.setLngLat([lng, lat]);
+        // Fall back to Mapbox Geocoding API
+        try {
+            const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(value)}.json?limit=1&access_token=${mapboxApiKey}`;
+            const resp = await fetch(url);
+            const data = await resp.json();
+            if (data.features && data.features.length > 0) {
+                const [lng, lat] = data.features[0].center;
+                flyToLocation(lat, lng);
+            } else {
+                showError('Location not found. Try a different name or use lat, lng format.');
             }
+        } catch (e) {
+            showError('Geocoding failed: ' + e.message);
+        }
+    }
 
-            console.log('Searched coordinates:', lat, lng);
-        } else {
-            showError('Invalid coordinates. Please use format: lat, lng (e.g., 39.778518, -86.246375)');
+    function flyToLocation(lat, lng) {
+        draw.deleteAll();
+        clearCoordinateOverlays();
+        setGridVisible(false);
+        map.flyTo({ center: [lng, lat], zoom: 15 });
+        if (centerMarker) {
+            centerMarker.setLngLat([lng, lat]);
         }
     }
 
@@ -789,6 +868,7 @@
             endData.append('maxZoom', zoomLevel);
             endData.append('polygonVertices', JSON.stringify(coords));
             endData.append('includeBuildings', includeBuildings);
+            endData.append('mapboxApiKey', mapboxApiKey);
             const endResp = await fetch('/end-download', { method: 'POST', body: endData });
             const endResult = await endResp.json();
             if (endResult.code !== 200) throw new Error('end-download failed');
@@ -1003,11 +1083,20 @@
             saveConfig();
         });
 
+        document.getElementById('setting-mapbox-key-btn').addEventListener('click', function () {
+            openApikeyModal(function (key) {
+                mapboxApiKey = key;
+                mapboxgl.accessToken = key;
+                if (!map) initializeMap();
+            });
+        });
+
         document.getElementById('settings-revert-btn').addEventListener('click', function () {
             Object.assign(config, DEFAULT_CONFIG);
             localStorage.removeItem(STORAGE_KEY);
             applyConfigToForm();
             if (gridVisible) { showGrid(); }
+            // Note: API key is intentionally not cleared by revert
         });
     }
 

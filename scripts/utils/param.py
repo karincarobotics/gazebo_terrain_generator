@@ -14,6 +14,3 @@ class globalParam:
 
     # Include a red debug sphere at world origin in the generated world file
     DEBUG_SPHERE                = False
-
-    # Free Mapbox API Key
-    MAPBOX_API_KEY              = "pk.eyJ1IjoiYXJhdmluZDE5NDAiLCJhIjoiY21jNDVyYTM5MDdxYjJqc2FjczA3bTBmeSJ9.kNLCV2BhlN0CRCOBJIpM1A"

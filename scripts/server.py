@@ -19,7 +19,7 @@ from utils.param import globalParam
 app = Flask(__name__)
 lock = threading.Lock()
 
-task_status = {"status": "idle"} # Global variable to track task status
+task_status = {"status": "idle", "messages": []} # Global variable to track task status
 
 
 def random_string():
@@ -41,12 +41,11 @@ def process_end_download(map_name, bounds, zoom_level, dem_resolution, include_b
 	global task_status
 
 	def progress(msg):
-		task_status["message"] = msg
+		task_status["messages"].append(msg)
 		print(msg)
 
 	try:
 		task_status["status"] = "in_progress"
-		task_status["message"] = ""
 		map_dir = get_map_dir(map_name)
 		true_boundaries = maptile_utiles.get_true_boundaries(bounds, zoom_level)
 
@@ -61,12 +60,12 @@ def process_end_download(map_name, bounds, zoom_level, dem_resolution, include_b
 		terrian_generator = GazeboTerrianGenerator(map_dir, include_buildings)
 		terrian_generator.generate_gazebo_world(progress_cb=progress)
 		task_status["status"] = "completed"
-		task_status["message"] = "World generated successfully."
+		task_status["messages"].append("World generated successfully.")
 		print("Gazebo world generation completed successfully.")
 
 	except Exception as e:
 		task_status["status"] = "failed"
-		task_status["message"] = f"Error: {e}"
+		task_status["messages"].append(f"Error: {e}")
 		print(f"Error during processing: {e}")
 
 
@@ -74,7 +73,9 @@ def process_end_download(map_name, bounds, zoom_level, dem_resolution, include_b
 @app.route('/task-status', methods=['GET'])
 def task_status_endpoint():
 	global task_status
-	return jsonify({"code": 200, "message": task_status})
+	messages = task_status["messages"]
+	task_status["messages"] = []
+	return jsonify({"code": 200, "message": {"status": task_status["status"], "messages": messages}})
 
 
 @app.route('/download-tile', methods=['POST'])
@@ -133,7 +134,7 @@ def start_download():
 		json.dump(metadata, f, indent=2)
 
 	global task_status
-	task_status = {"status": "idle"}
+	task_status = {"status": "idle", "messages": []}
 	return jsonify({"code": 200, "message": "Metadata written"})
 
 

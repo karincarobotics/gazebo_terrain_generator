@@ -881,29 +881,24 @@
         pollGenerationStatus(modelName);
     }
 
-    let lastProgressMessage = '';
-
     async function pollGenerationStatus(mapName) {
         if (generationCancelled) return;
         try {
             const resp = await fetch('/task-status');
             const data = await resp.json();
             const status = data.message.status;
-            const msg = data.message.message || '';
+            const messages = data.message.messages || [];
 
             if (status === 'completed') {
-                if (msg && msg !== lastProgressMessage) logToConsole(msg, 'success');
+                messages.forEach(msg => logToConsole(msg, 'success'));
                 setConsoleStatus('completed');
                 setConsoleCloseMode(mapName);
             } else if (status === 'failed') {
-                if (msg && msg !== lastProgressMessage) logToConsole(msg, 'error');
+                messages.forEach(msg => logToConsole(msg, 'error'));
                 setConsoleStatus('failed');
                 setConsoleCloseMode();
             } else {
-                if (msg && msg !== lastProgressMessage) {
-                    logToConsole(msg);
-                    lastProgressMessage = msg;
-                }
+                messages.forEach(msg => logToConsole(msg));
                 pollingTimer = setTimeout(() => pollGenerationStatus(mapName), 1000);
             }
         } catch (e) {

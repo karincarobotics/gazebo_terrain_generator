@@ -13,7 +13,7 @@ Originally forked from [saiaravind19/gazebo_terrain_generator](https://github.co
   <img src="media/gazebo.png" alt="Generated world in Gazebo Harmonic" width="100%"/>
 </p>
 
-<video src="media/gazebo_terrain_generator.mp4" controls width="100%"></video>
+<video src="https://github.com/user-attachments/assets/42289e73-c66a-4605-85c6-c95d13139d44" controls width="100%"></video>
 
 ---
 

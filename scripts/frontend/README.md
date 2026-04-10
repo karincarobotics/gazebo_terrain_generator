@@ -1,41 +1,21 @@
-# Frontend Structure
+# Frontend
 
-This directory contains the frontend code for the Gazebo Terrain Generator web application.
+Single-page web UI for the Gazebo Terrain Generator, served by the Flask backend at `http://localhost:8080`.
 
-## Directory Structure
+## Stack
+
+- [Mapbox GL JS](https://docs.mapbox.com/mapbox-gl-js/) — map rendering and satellite imagery
+- [Mapbox GL Draw](https://github.com/mapbox/mapbox-gl-draw) — polygon selection tool
+- [Turf.js](https://turfjs.org/) — client-side geospatial utilities
+- [Toastify](https://github.com/apvarun/toastify-js) — toast notifications
+- [Font Awesome](https://fontawesome.com/) — icons
+- Vanilla JavaScript (no framework)
+
+## Files
 
 ```
 frontend/
-├── lib/        # Third-party libraries (jQuery, Mapbox, etc.)
-├── js/         # Application JavaScript files
-├── css/        # Stylesheets
-├── assets/     # Static assets
-│   ├── images/ # Images, icons, SVGs
-│   └── fonts/  # Custom fonts
-└── index.html  # Main HTML file
+  index.html   — Single HTML file with all modals and UI structure
+  js/main.js   — All application logic
+  css/main.css — All styles
 ```
-
-## Organization
-
-### `lib/`
-Contains all third-party JavaScript libraries and frameworks. This keeps external dependencies separate from application code.
-
-### `js/`
-Application-specific JavaScript files organized by functionality:
-- Map-related code (Mapbox integration, drawing tools)
-- UI interactions and controls
-- Download/generation logic
-- Utility functions (coordinate conversions, tile calculations)
-
-### `css/`
-All stylesheets for the application.
-
-### `assets/`
-Static resources like images, icons, and fonts used throughout the application.
-
-## Development
-
-This is a simple, vanilla JavaScript structure designed to be:
-- **Easy to understand**: Clear separation of concerns
-- **Simple to maintain**: Minimal abstraction
-- **Extensible**: Easy to add new features as needed

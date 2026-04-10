@@ -1,158 +1,152 @@
-# Gazebo Terrain Generator  [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/saiaravind19/gazebo_terrain_generator) 
+# Gazebo Terrain Generator
 
+A web-based tool that generates self-contained [Gazebo Harmonic](https://gazebosim.org/docs/harmonic/) worlds from real-world satellite imagery and elevation data. Draw a polygon on a map, set a spawn location, and get a ready-to-use `.world` file with a textured heightmap and optional 3D buildings.
 
-
-A super easy-to-use tool for generate 3D Gazebo terrain using real-world elevation and satellite data.
-
+Developed by [Karinca Robotics](https://karinca.com.tr) for [Polymath Robotics](https://polymathrobotics.com).
+Originally forked from [saiaravind19/gazebo_terrain_generator](https://github.com/saiaravind19/gazebo_terrain_generator).
 
 <p align="center">
-  <a href="https://www.youtube.com/embed/TsV34XBntnY?si=zK0TL7pK_RhsNW05">
-    <img src="gif/thumnail.png" alt="Project Demo" width="1050"/>
-  </a>
+  <img src="media/webui.png" alt="Web UI" width="100%"/>
 </p>
 
 <p align="center">
-  <a href="https://youtu.be/-RYXWoHUZNU?si=jEtrnxKcaVLolqhM">
-    <img src="gif/building.png" alt="Project Demo" width="1050"/>
-  </a>
+  <img src="media/gazebo.png" alt="Generated world in Gazebo Harmonic" width="100%"/>
 </p>
+
+<video src="media/gazebo_terrain_generator.mp4" controls width="100%"></video>
+
+---
 
 ## Features
 
-- **Real-World Terrain Generation**: Generate 3D Gazebo worlds using actual elevation data and satellite images of any location on Earth.
-- **3D Buildings**: Add or remove buildings to the gazebo world with a toogle button.
-- **Configurable Spawn Location**: Change the spawn location using interactive UI marker within the region of interest
-- **Configurable Output**: Flexible output paths via environment variables for different deployment scenarios
-- **Customizable Resolution**: Adjustable tile resolution.
-- **Complete World Generation**: Generates the entire model with no hassle out of the box
+- Draw a polygon on a live satellite map to select any area on Earth
+- Real-world elevation data via Mapbox Terrain-DEM-v1 (SRTM ~30m resolution)
+- Satellite imagery texture stitched from configurable tile sources
+- 16-bit heightmap for ~0.008m elevation precision
+- Normal map generated from heightmap gradients for realistic terrain shading
+- Optional 3D buildings from OpenStreetMap footprints
+- Configurable spawn location — robot spawns with correct GPS coordinates at world origin
+- Downloadable zip with world file, terrain data, and optionally raw tiles
 
-## Supported and Tested Stack
+---
 
-- **[Gazebo Harmonic](https://gazebosim.org/docs/harmonic/install_ubuntu/)**
-## 🛠️ Setup Instructions
+## Requirements
 
-### Create and Activate Virtual Environment (Recommended)
+- Python 3.12+
+- [Gazebo Harmonic](https://gazebosim.org/docs/harmonic/install_ubuntu/) or above
+- A [Mapbox account](https://www.mapbox.com/) with a public access token (free tier is sufficient)
 
-It's recommended to use a virtual environment to avoid dependency conflicts:
+---
 
-```bash
-python3 -m venv terrain_generator
-source terrain_generator/bin/activate
-```
-
-
-### Install Requirements
-
-Make sure your virtual environment is active, then install all required Python packages using:
-  ```bash
-  pip install -r requirements.txt
-  ```
-
-## ⚙️ Configuration
-
-### Environment Variables
-
-You can customize where Gazebo Models and World are saved using environment variables:
+## Setup
 
 ```bash
-export GAZEBO_MODEL_PATH="~/Desktop/gazebo_models"
-export GAZEBO_WORLD_PATH="~/Desktop/gazebo_models/worlds"
+# Clone the repository
+git clone <repo-url>
+cd gazebo_terrain_generator
 
+# Create and activate a virtual environment
+python3 -m venv venv
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
 ```
 
-**Default Location**: If no environment variable is set, model and worlds files are saved to:
-```
-Models saved in **~/gazebo_terrian_generator/output/gazebo_terrain/**
-World files in **~/gazebo_terrian_generator/output/gazebo_terrain/worlds**
+---
 
-```
+## Running
 
-### File Structure
-
-Generated model follow this structure:
-```
-<GAZEBO_MODEL_PATH>/
-├── model_name/
-│   ├── model.sdf              # Gazebo model definition
-│   ├── model.config           # Model configuration
-│   ├── model_name.sdf         # Gazebo world file
-│   └── textures/
-│       ├── world_name_height_map.tif    # Elevation heightmap
-│       └── world_name_aerial.png        # Satellite imagery texture
-<GAZEBO_WORLD_PATH>/
-├──model_name.sdf         # Gazebo world file
-├──model_name_1.sdf       # Gazebo world file
-├──model_name_2.sdf       # Gazebo world file
-
+```bash
+source venv/bin/activate
+python scripts/server.py
 ```
 
-## 🚀 Run Gazebo World Generator
+Then open [http://localhost:8080](http://localhost:8080) in your browser.
 
-1. Navigate to **gazebo_terrian_generator** and start the applciation.
-    ```bash
-    source terrain_generator/bin/activate
-    python scripts/server.py
-    ```
+---
 
-2. Access the Web Interface: 
-   Open your web browser and navigate to `http://localhost:8080`
+## Mapbox API Key
 
-3. Generate Your World:
-   - Search for any location on Earth
-   - Draw a rectangular region of interest
-   - Place launch pad marker at desired spawn location.
-   - Enable/Dissable buildings based on usecase.
-   - Configure settings (zoom level, map source)
-   - Click "Generate Terrain" to create your world
+A Mapbox public access token is required for satellite imagery, elevation data, and geocoding.
 
-4. Output Location: 
-   Generated worlds are saved to the configured path (see Environment Variables section above)
+1. Create a free account at [mapbox.com](https://www.mapbox.com/) and copy your public token (`pk.eyJ1...`)
+2. In the web UI, open **Settings** → click the **Mapbox API Key** field
+3. Paste your token and click **Save** — it is validated immediately and stored in your browser only
 
-## 🏁 Spawning Gazebo Worlds
+The key is never stored server-side.
 
-1. **Export the gazebo model path**:
-    ```bash
-    export GZ_SIM_RESOURCE_PATH=$GZ_SIM_RESOURCE_PATH:<path_to_your_gazebo_worlds>
-    ```
+---
 
-2. **Run Gazebo with your world**:
-    ```bash
-    gz sim your_world_name/your_world_name.sdf
-    ```
+## Usage
 
-**Note**: Replace `<path_to_your_gazebo_worlds>` with the actual path where your worlds are saved.
+1. **Search** — type a place name or GPS coordinates (`lat, lng`) in the search box
+2. **Draw** — use the polygon tool to outline your area of interest on the map
+3. **Set spawn location** — drag the pin to where your robot should spawn
+4. **Configure** (optional) — open Settings to adjust zoom level, tile source, buildings toggle
+5. **Generate** — click **Generate Terrain**, name your world, and watch the console
+6. **Download** — once complete, click **Download World** to get a zip file
 
+---
 
-## 📋 Sample Worlds Example
+## Settings
 
-Test the installation with provided sample worlds:
+| Setting | Default | Description |
+|---|---|---|
+| Zoom Level | 17 | Satellite tile zoom (higher = more detail, more tiles) |
+| Include Buildings | On | Download OSM building footprints and extrude as 3D meshes |
+| Map Tile Source | Bing Aerial | Satellite tile provider URL template |
+| Parallel Downloads | 4 | Concurrent tile download threads |
 
-1. **Export the sample gazebo model path**:
-    ```bash
-    export GZ_SIM_RESOURCE_PATH=$GZ_SIM_RESOURCE_PATH:~/gazebo_terrian_generator/sample_worlds
-    ```
+---
 
-2. **Launch sample world**:
-    ```bash
-    gz sim prayag/prayag.sdf
-    ```
+## Output Structure
 
-## 🔑 MapBox API Key
-A free api key is being used in the repo if it gets limited then please feel free to create your own API key from official [MapBox's website](https://www.mapbox.com/) and replace it in the [`configuration file`](scripts/utils/param.py)
+Generated files are stored under `/tmp/gazebo_terrain_generator/{world_name}/`:
 
-## Important Disclaimer
+```
+{world_name}/
+  {world_name}.world      — self-contained Gazebo world file
+  metadata.json           — generation parameters (bounds, zoom, spawn location, etc.)
+  terrain_data/
+    aerial.png            — stitched satellite texture
+    height_map.png        — 16-bit grayscale heightmap
+    normal_map.png        — normal map derived from heightmap
+    buildings.dae         — 3D building mesh (if buildings enabled and OSM data exists)
+    buildings.geojson     — raw building footprints (if buildings enabled)
+  tiles/                  — raw satellite tiles (included in zip if "Include raw tiles" checked)
+  dem/                    — raw DEM tiles (included in zip if "Include raw tiles" checked)
+  building_tiles/         — raw vector tile cache (included in zip if "Include raw tiles" checked)
+```
 
-Downloading map tiles is subject to the terms and conditions of the tile provider. Some providers such as Google Maps have restrictions in place to avoid abuse, therefore before downloading any tiles make sure you understand their TOCs. I recommend not using Google, Bing, and ESRI tiles in any commercial application without their consent.
+---
+
+## Opening in Gazebo
+
+Run directly:
+
+```bash
+gz sim /tmp/gazebo_terrain_generator/{world_name}/{world_name}.world
+```
+
+Or unzip the downloaded archive anywhere and run:
+
+```bash
+gz sim {world_name}/{world_name}.world
+```
+
+---
+
+## Tile Source URLs
+
+The default tile source is Bing Aerial. Other providers can be entered manually using URL templates with `{x}`, `{y}`, `{z}` or `{quad}` placeholders. Check your provider's terms of service before use — some providers (Google, Bing, ESRI) restrict commercial use without a license agreement.
+
+---
 
 ## License
 
-This project is licensed under the **BSD 3-Clause License**.  
-See the [LICENSE](LICENSE) file for full details.  
+BSD 3-Clause License. See [LICENSE](LICENSE) for details.
 
-Portions of this project are derived from **MapTilesDownloader** by [Ali Ashraf](https://github.com/AliFlux/MapTilesDownloader),  
-which is licensed under the **MIT License**. The MIT-licensed components remain under their original terms.
-
-## Reference
-- [Gazebo Heightmap](https://github.com/AS4SR/general_info/wiki/Creating-Heightmaps-for-Gazebo
-)
-- [Mapbox Dem](https://docs.mapbox.com/data/tilesets/reference/mapbox-terrain-dem-v1/)
+This project incorporates work from:
+- [saiaravind19/gazebo_terrain_generator](https://github.com/saiaravind19/gazebo_terrain_generator) — BSD 3-Clause
+- [MapTilesDownloader](https://github.com/AliFlux/MapTilesDownloader) by Ali Ashraf — MIT

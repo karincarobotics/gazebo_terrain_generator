@@ -9,12 +9,11 @@ import shutil
 import tempfile
 from pathlib import Path
 import mimetypes
-from utils.demTilesDownloader import download_dem_data
-from utils.buildingDownloader import download_streetmap_data
+from utils.dem_tiles_downloader import download_dem_data
+from utils.building_downloader import download_streetmap_data
 from utils.utils import Utils
-from utils.gazeboWorldGenerator import GazeboTerrianGenerator
-from utils.maptileUtils import maptile_utiles
-from utils.param import globalParam
+from utils.gazebo_world_generator import GazeboTerrainGenerator
+from utils.maptile_utils import MapTileUtils
 
 app = Flask(__name__)
 lock = threading.Lock()
@@ -47,7 +46,7 @@ def process_end_download(map_name, bounds, zoom_level, dem_resolution, include_b
 	try:
 		task_status["status"] = "in_progress"
 		map_dir = get_map_dir(map_name)
-		true_boundaries = maptile_utiles.get_true_boundaries(bounds, zoom_level)
+		true_boundaries = MapTileUtils.get_true_boundaries(bounds, zoom_level)
 
 		progress("Downloading elevation data (DEM)...")
 		dem_path = os.path.join(map_dir, 'dem')
@@ -57,8 +56,8 @@ def process_end_download(map_name, bounds, zoom_level, dem_resolution, include_b
 			progress("Downloading building footprint data...")
 			download_streetmap_data(true_boundaries, os.path.join(map_dir, 'building_tiles'), os.path.join(map_dir, 'terrain_data'), api_key=api_key, polygon_vertices=polygon_vertices)
 
-		terrian_generator = GazeboTerrianGenerator(map_dir, include_buildings)
-		terrian_generator.generate_gazebo_world(progress_cb=progress)
+		terrain_generator = GazeboTerrainGenerator(map_dir, include_buildings)
+		terrain_generator.generate_gazebo_world(progress_cb=progress)
 		task_status["status"] = "completed"
 		task_status["messages"].append("World generated successfully.")
 		print("Gazebo world generation completed successfully.")
@@ -83,17 +82,17 @@ def download_tile():
 	postvars = request.form
 	x = int(postvars['x'])
 	y = int(postvars['y'])
-	z = int(postvars['z'])
+	zoom = int(postvars['z'])
 	map_name = str(postvars['mapName'])
 	source = str(postvars['source'])
 
-	file_path = os.path.join(get_map_dir(map_name), 'tiles', f"[{z},{y},{x}].png")
+	file_path = os.path.join(get_map_dir(map_name), 'tiles', f"[{zoom},{y},{x}].png")
 
 	if os.path.isfile(file_path):
 		return jsonify({"code": 200, "message": "Tile already exists"})
 
 	os.makedirs(os.path.dirname(file_path), exist_ok=True)
-	code = Utils.download_file(source, file_path, x, y, z)
+	code = Utils.download_file(source, file_path, x, y, zoom)
 
 	if code == 200:
 		return jsonify({"code": 200, "message": "Tile downloaded"})
@@ -194,16 +193,6 @@ def serve_static(path):
 	file_dir = os.path.join(str(Path(__file__).resolve().parent), 'frontend')
 	mime_type, _ = mimetypes.guess_type(path)
 	return send_from_directory(file_dir, path, mimetype=mime_type)
-
-
-#VTODO: remove once new frontend is fully functional
-@app.route('/old/', defaults={'path': 'index.htm'})
-@app.route('/old/<path:path>')
-def serve_static_old(path):
-	file_dir = os.path.join(str(Path(__file__).resolve().parent), 'UI')
-	mime_type, _ = mimetypes.guess_type(path)
-	return send_from_directory(file_dir, path, mimetype=mime_type)
-
 
 if __name__ == '__main__':
 	print("Starting Flask server...")

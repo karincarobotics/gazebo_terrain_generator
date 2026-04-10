@@ -3,7 +3,7 @@ import os
 import numpy as np
 import math
 from PIL import Image
-from utils.maptileUtils import maptile_utiles
+from utils.maptile_utils import MapTileUtils
 from utils.utils import ConcatImage
 
 
@@ -48,8 +48,8 @@ class HeightmapGenerator(ConcatImage):
         Returns:
             float: Height above mean sea level in meters.
         """
-        tile_x, tile_y = maptile_utiles.lat_lon_to_tile(lat, lon, dem_resolution)
-        boundaries = maptile_utiles.get_tile_bounds(tile_x, tile_y, dem_resolution)
+        tile_x, tile_y = MapTileUtils.lat_lon_to_tile(lat, lon, dem_resolution)
+        boundaries = MapTileUtils.get_tile_bounds(tile_x, tile_y, dem_resolution)
         lat_max = boundaries["northeast"][0]
         lat_min = boundaries["southwest"][0]
         lon_max = boundaries["northeast"][1]
@@ -88,7 +88,7 @@ class HeightmapGenerator(ConcatImage):
 
         #get the true boundaries — there is non-uniform padding added by tile alignment
         bound_array = boundaries.split(',')
-        true_boundaries = maptile_utiles.get_true_boundaries(bound_array, zoomlevel)
+        true_boundaries = MapTileUtils.get_true_boundaries(bound_array, zoomlevel)
         true_bound_array = [true_boundaries["southwest"][1], true_boundaries["southwest"][0],
                             true_boundaries["northeast"][1], true_boundaries["northeast"][0]]
 
@@ -97,7 +97,7 @@ class HeightmapGenerator(ConcatImage):
 
         # dem_snap_boundaries: the tile-aligned bounds of the stitched DEM image at DEM resolution,
         # used to crop back down to the actual desired area (true_boundaries)
-        dem_snap_boundaries = maptile_utiles.get_true_boundaries(true_bound_array, dem_resolution)
+        dem_snap_boundaries = MapTileUtils.get_true_boundaries(true_bound_array, dem_resolution)
 
         height, width = stitched_image.shape[:2]
         crop_px_cord = self.get_dem_px_bounds(true_boundaries, dem_snap_boundaries, height, width)

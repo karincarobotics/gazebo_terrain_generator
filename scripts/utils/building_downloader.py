@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import List, Tuple, Dict, Any
 from shapely.geometry import shape, mapping, Polygon as ShapelyPolygon
 from shapely.ops import unary_union
-from utils.maptileUtils import maptile_utiles
+from utils.maptile_utils import MapTileUtils
 import mercantile
 from multiprocessing import Pool, cpu_count
 
@@ -30,14 +30,14 @@ class BuildingDownloader:
         """
 
     @staticmethod
-    def download_tile(zoom : int, x: int, y: int, output_dir: str, api_key: str) -> Dict[str, Any]:
+    def download_tile(zoom : int, tile_x: int, tile_y: int, output_dir: str, api_key: str) -> Dict[str, Any]:
         """
         Download a single vector tile containing building data and convert to GeoJSON.
 
         Args:
-            x: Tile X coordinate
-            y: Tile Y coordinate
-            z: Zoom level
+            zoom: Zoom level
+            tile_x: Tile X coordinate
+            tile_y: Tile Y coordinate
             api_key: Mapbox API key.
 
         Returns:
@@ -45,7 +45,7 @@ class BuildingDownloader:
         """
         base_url = "https://api.mapbox.com/v4/mapbox.mapbox-streets-v8"
 
-        url = f"{base_url}/{zoom}/{x}/{y}.vector.pbf?access_token={api_key}"
+        url = f"{base_url}/{zoom}/{tile_x}/{tile_y}.vector.pbf?access_token={api_key}"
 
         try:
             response = requests.get(url, timeout=30)
@@ -53,10 +53,10 @@ class BuildingDownloader:
 
             # Decode the Protocol Buffer vector tile and cache as JSON
             tile_data = mapbox_vector_tile.decode(response.content)
-            with open(f"{output_dir}/{y}.json", "w") as f:
+            with open(f"{output_dir}/{tile_y}.json", "w") as f:
                 json.dump(tile_data, f)
         except Exception as e:
-            print(f"Error while downloading tile {zoom}/{x}/{y}: {e}")
+            print(f"Error while downloading tile {zoom}/{tile_x}/{tile_y}: {e}")
             return {"type": "FeatureCollection", "features": []}
 
     def _tile_to_geojson(self, tile_path: str, x: int, y: int, z: int) -> Dict[str, Any]:
@@ -173,26 +173,26 @@ class BuildingDownloader:
         nw_lat, nw_lon = map(float, bound_array["northwest"])
         se_lat, se_lon = map(float, bound_array["southeast"])
 
-        nw_tilex, nw_tiley = maptile_utiles.lat_lon_to_tile(nw_lat, nw_lon, zoom)
-        se_tilex, se_tiley = maptile_utiles.lat_lon_to_tile(se_lat, se_lon, zoom)
+        nw_tile_x, nw_tile_y = MapTileUtils.lat_lon_to_tile(nw_lat, nw_lon, zoom)
+        se_tile_x, se_tile_y = MapTileUtils.lat_lon_to_tile(se_lat, se_lon, zoom)
 
-        tilex_start, tilex_end = sorted((nw_tilex, se_tilex))
-        tiley_start, tiley_end = sorted((nw_tiley, se_tiley))
+        tile_x_start, tile_x_end = sorted((nw_tile_x, se_tile_x))
+        tile_y_start, tile_y_end = sorted((nw_tile_y, se_tile_y))
 
         # ---- Directory setup ----
-        maptile_utiles.dir_check(output_directory)
+        MapTileUtils.dir_check(output_directory)
         zoom_dir = os.path.join(output_directory, str(zoom))
-        maptile_utiles.dir_check(zoom_dir)
+        MapTileUtils.dir_check(zoom_dir)
 
         # ---- Prepare download tasks ----
         tasks = []
-        for x in range(tilex_start, tilex_end + 1):
-            x_dir = os.path.join(zoom_dir, str(x))
-            maptile_utiles.dir_check(x_dir)
-            for y in range(tiley_start, tiley_end + 1):
-                tile_path = os.path.join(x_dir, f"{y}.json")
+        for tile_x in range(tile_x_start, tile_x_end + 1):
+            tile_x_dir = os.path.join(zoom_dir, str(tile_x))
+            MapTileUtils.dir_check(tile_x_dir)
+            for tile_y in range(tile_y_start, tile_y_end + 1):
+                tile_path = os.path.join(tile_x_dir, f"{tile_y}.json")
                 if not os.path.isfile(tile_path):
-                    tasks.append((zoom, x, y, x_dir, api_key))
+                    tasks.append((zoom, tile_x, tile_y, tile_x_dir, api_key))
 
         # ---- Download missing tiles ----
         if tasks:
@@ -203,17 +203,17 @@ class BuildingDownloader:
         filter_shape = ShapelyPolygon(polygon_vertices)
 
         # ---- READ tiles ONE BY ONE (important part) ----
-        for x in range(tilex_start, tilex_end + 1):
-            for y in range(tiley_start, tiley_end + 1):
-                tile_path = os.path.join(zoom_dir, str(x), f"{y}.json")
+        for tile_x in range(tile_x_start, tile_x_end + 1):
+            for tile_y in range(tile_y_start, tile_y_end + 1):
+                tile_path = os.path.join(zoom_dir, str(tile_x), f"{tile_y}.json")
 
                 if not os.path.isfile(tile_path):
                     print(f"Warning: Missing tile file {tile_path}")
                     continue  # failed or missing tile
 
                 # Convert tile → GeoJSON
-                tile_geojson = self._tile_to_geojson(tile_path, x, y, zoom)
-                #print(f"Processed tile {zoom}/{x}/{y} with {len(tile_geojson.get('features', []))} buildings")
+                tile_geojson = self._tile_to_geojson(tile_path, tile_x, tile_y, zoom)
+                #print(f"Processed tile {zoom}/{tile_x}/{tile_y} with {len(tile_geojson.get('features', []))} buildings")
                 if not tile_geojson or "features" not in tile_geojson:
                     continue
 

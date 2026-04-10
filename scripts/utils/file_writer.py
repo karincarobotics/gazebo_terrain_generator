@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from utils.param import globalParam
+from utils.param import GlobalParam
 
 TEMPLATE_DIR = str(Path(__file__).resolve().parents[2] / 'templates')
 
@@ -70,7 +70,7 @@ class FileWriter:
         sdf_template = sdf_template.replace("$ORIGIN_LAT$", str(launch_lat))
         sdf_template = sdf_template.replace("$ORIGIN_LONG$", str(launch_lon))
         sdf_template = sdf_template.replace("$ORIGIN_ELEVATION$", str(origin_elevation))
-        if globalParam.DEBUG_SPHERE:
+        if GlobalParam.DEBUG_SPHERE:
             debug_sphere_block = FileWriter.read_template(
                 os.path.join(TEMPLATE_DIR, 'debug_sphere_template.sdf')
             )

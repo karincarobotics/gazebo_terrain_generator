@@ -1,4 +1,4 @@
-class globalParam:
+class GlobalParam:
 
     # Draw tile borders on aerial.png output for debugging tile grid alignment
     DEBUG_TILE_BORDERS          = False

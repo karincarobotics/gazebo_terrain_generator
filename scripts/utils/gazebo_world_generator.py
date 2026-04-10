@@ -2,11 +2,11 @@ import os
 import cv2
 import json
 import numpy as np
-from utils.fileWriter import FileWriter, TEMPLATE_DIR
-from utils.param import globalParam
-from utils.maptileUtils import maptile_utiles
-from utils.buildingsGenerator import GeoJSONToDAE
-from utils.heightMapGenerator import HeightmapGenerator
+from utils.file_writer import FileWriter, TEMPLATE_DIR
+from utils.param import GlobalParam
+from utils.maptile_utils import MapTileUtils
+from utils.buildings_generator import GeoJSONToDAE
+from utils.height_map_generator import HeightmapGenerator
 from utils.utils import ConcatImage
 from geopy.distance import geodesic
 from geopy.point import Point
@@ -58,7 +58,7 @@ class OrthoGenerator(ConcatImage):
             padded[:h, :w] = stitched_image
             stitched_image = padded
 
-        if globalParam.DEBUG_TILE_BORDERS:
+        if GlobalParam.DEBUG_TILE_BORDERS:
             n_cols = x_max - x_min + 1
             n_rows = y_max - y_min + 1
             border_color = (0, 0, 255)  # red in BGR
@@ -86,7 +86,7 @@ class OrthoGenerator(ConcatImage):
 
 
 
-class GazeboTerrianGenerator(HeightmapGenerator,OrthoGenerator):
+class GazeboTerrainGenerator(HeightmapGenerator, OrthoGenerator):
     def __init__(self,tile_path:str,include_buildings: bool,**kwargs):
         super().__init__(**kwargs)
         self.tile_path = tile_path
@@ -127,7 +127,7 @@ class GazeboTerrianGenerator(HeightmapGenerator,OrthoGenerator):
         """
     
         bound_array = self.boundaries.split(',')
-        boundaries = maptile_utiles.get_true_boundaries(bound_array,self.zoom_level)
+        boundaries = MapTileUtils.get_true_boundaries(bound_array,self.zoom_level)
 
         sw = boundaries["southwest"]
         se = boundaries["southeast"]
@@ -254,7 +254,7 @@ class GazeboTerrianGenerator(HeightmapGenerator,OrthoGenerator):
             tuple: A tuple containing size_x, size_y, size_z, and pose_z.
         """
         bound_array = self.boundaries.split(',')
-        true_boundaries = maptile_utiles.get_true_boundaries(bound_array, self.zoom_level)
+        true_boundaries = MapTileUtils.get_true_boundaries(bound_array, self.zoom_level)
         
         # Calculate map dimensions
         sw = true_boundaries["southwest"]
@@ -306,7 +306,7 @@ class GazeboTerrianGenerator(HeightmapGenerator,OrthoGenerator):
                 terrain_data_dir = os.path.join(self.tile_path, 'terrain_data')
                 street_map = os.path.join(terrain_data_dir, 'buildings.geojson')
                 output_dae_file = os.path.join(terrain_data_dir, 'buildings.dae')
-                true_boundaries = maptile_utiles.get_true_boundaries(self.boundaries.split(','), self.zoom_level)
+                true_boundaries = MapTileUtils.get_true_boundaries(self.boundaries.split(','), self.zoom_level)
                 geojson_to_dae = GeoJSONToDAE(street_map, output_dae_file)
                 geojson_to_dae.run(origin_coord, size_z, pose_z, self.heightmap, true_boundaries)
 

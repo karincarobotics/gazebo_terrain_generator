@@ -2,9 +2,8 @@ from urllib import request
 import numpy as np
 import cv2
 import os
-from utils.maptileUtils import maptile_utiles
+from utils.maptile_utils import MapTileUtils
 from multiprocessing import Pool, cpu_count
-from utils.param import globalParam
 
 
 def fetch_image_from_url(url: str):
@@ -47,17 +46,17 @@ def download_tile_image(args: tuple) -> None:
     Returns:
         None
     """
-    zoom, x, y, output_dir, api_key = args
+    zoom, tile_x, tile_y, output_dir, api_key = args
     tile_url = (
         f"https://api.mapbox.com/raster/v1/mapbox.mapbox-terrain-dem-v1/"
-        f"{zoom}/{x}/{y}.webp?sku=101CUGorpzzyK&access_token={api_key}"
+        f"{zoom}/{tile_x}/{tile_y}.webp?sku=101CUGorpzzyK&access_token={api_key}"
     )
     img = fetch_image_from_url(tile_url)
     if img is not None:
-        file_path = os.path.join(output_dir, f"[{zoom},{y},{x}].png")
+        file_path = os.path.join(output_dir, f"[{zoom},{tile_y},{tile_x}].png")
         cv2.imwrite(file_path, img)
     else:
-        print(f"[WARN] Skipped tile ({x}, {y}) due to download error.")
+        print(f"[WARN] Skipped tile ({tile_x}, {tile_y}) due to download error.")
 
 
 def download_dem_data(bound_array, output_directory, zoom: int, api_key: str) -> None:
@@ -77,18 +76,18 @@ def download_dem_data(bound_array, output_directory, zoom: int, api_key: str) ->
         tasks = []
         nw_lat, nw_lon = map(float, bound_array["northwest"])
         se_lat, se_lon = map(float, bound_array["southeast"])
-        maptile_utiles.dir_check(output_directory)
+        MapTileUtils.dir_check(output_directory)
 
-        nw_tilex, nw_tiley = maptile_utiles.lat_lon_to_tile(nw_lat, nw_lon, zoom)
-        se_tilex, se_tiley = maptile_utiles.lat_lon_to_tile(se_lat, se_lon, zoom)
+        nw_tile_x, nw_tile_y = MapTileUtils.lat_lon_to_tile(nw_lat, nw_lon, zoom)
+        se_tile_x, se_tile_y = MapTileUtils.lat_lon_to_tile(se_lat, se_lon, zoom)
 
-        tilex_start, tilex_end = sorted((nw_tilex, se_tilex))
-        tiley_start, tiley_end = sorted((nw_tiley, se_tiley))
-        for x in range(tilex_start, tilex_end + 1):
-            for y in range(tiley_start, tiley_end + 1):
-                dem_file = os.path.join(output_directory, f"[{zoom},{y},{x}].png")
+        tile_x_start, tile_x_end = sorted((nw_tile_x, se_tile_x))
+        tile_y_start, tile_y_end = sorted((nw_tile_y, se_tile_y))
+        for tile_x in range(tile_x_start, tile_x_end + 1):
+            for tile_y in range(tile_y_start, tile_y_end + 1):
+                dem_file = os.path.join(output_directory, f"[{zoom},{tile_y},{tile_x}].png")
                 if not check_dem_file(dem_file):
-                    tasks.append((zoom, x, y, output_directory, api_key))
+                    tasks.append((zoom, tile_x, tile_y, output_directory, api_key))
 
         with Pool(processes=cpu_count()) as pool:
             pool.map(download_tile_image, tasks)

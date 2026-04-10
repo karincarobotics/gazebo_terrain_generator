@@ -2,9 +2,9 @@ import mercantile
 import os, shutil
 
 
-class maptile_utiles:
+class MapTileUtils:
     @staticmethod
-    def get_tile_bounds(x, y, zoom):
+    def get_tile_bounds(tile_x, tile_y, zoom):
         """
         Get the latitude/longitude bounds of a tile using the mercantile library.
         Parameters:
@@ -15,7 +15,7 @@ class maptile_utiles:
         - dict: A dictionary with 'north', 'south', 'east', 'west' latitude/longitude boundaries.
         """
         # Get the bounds of the tile
-        bounds = mercantile.bounds(x, y, zoom)
+        bounds = mercantile.bounds(tile_x, tile_y, zoom)
 
         return {
             "southwest": (bounds.south, bounds.west),  # Southwest corner
@@ -36,10 +36,10 @@ class maptile_utiles:
         ne = (float(bound_array[3]), float(bound_array[2]))
         se = (float(bound_array[1]), float(bound_array[2]))
 
-        sw_tile_x, sw_tile_y = maptile_utiles.lat_lon_to_tile(sw[0], sw[1], zoom)
-        nw_tile_x, nw_tile_y = maptile_utiles.lat_lon_to_tile(nw[0], nw[1], zoom)
-        ne_tile_x, ne_tile_y = maptile_utiles.lat_lon_to_tile(ne[0], ne[1], zoom)
-        se_tile_x, se_tile_y = maptile_utiles.lat_lon_to_tile(se[0], se[1], zoom)
+        sw_tile_x, sw_tile_y = MapTileUtils.lat_lon_to_tile(sw[0], sw[1], zoom)
+        nw_tile_x, nw_tile_y = MapTileUtils.lat_lon_to_tile(nw[0], nw[1], zoom)
+        ne_tile_x, ne_tile_y = MapTileUtils.lat_lon_to_tile(ne[0], ne[1], zoom)
+        se_tile_x, se_tile_y = MapTileUtils.lat_lon_to_tile(se[0], se[1], zoom)
 
         return {
             "southwest": (sw_tile_x, sw_tile_y),
@@ -54,14 +54,14 @@ class maptile_utiles:
         Returns the lat log of the boundaries
         
         '''
-        boundaries = maptile_utiles.get_max_tilenumber(bound_array, zoom)
-        true_sw = maptile_utiles.get_tile_bounds(boundaries["southwest"][0], boundaries["southwest"][1], zoom)[
+        boundaries = MapTileUtils.get_max_tilenumber(bound_array, zoom)
+        true_sw = MapTileUtils.get_tile_bounds(boundaries["southwest"][0], boundaries["southwest"][1], zoom)[
             "southwest"]
-        true_se = maptile_utiles.get_tile_bounds(boundaries["southeast"][0], boundaries["southeast"][1], zoom)[
+        true_se = MapTileUtils.get_tile_bounds(boundaries["southeast"][0], boundaries["southeast"][1], zoom)[
             "southeast"]
-        true_nw = maptile_utiles.get_tile_bounds(boundaries["northwest"][0], boundaries["northwest"][1], zoom)[
+        true_nw = MapTileUtils.get_tile_bounds(boundaries["northwest"][0], boundaries["northwest"][1], zoom)[
             "northwest"]
-        true_ne = maptile_utiles.get_tile_bounds(boundaries["northeast"][0], boundaries["northeast"][1], zoom)[
+        true_ne = MapTileUtils.get_tile_bounds(boundaries["northeast"][0], boundaries["northeast"][1], zoom)[
             "northeast"]
 
         return {

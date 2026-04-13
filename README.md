@@ -10,7 +10,7 @@ Originally forked from [saiaravind19/gazebo_terrain_generator](https://github.co
 </p>
 
 <p align="center">
-  <img src="media/gazebo.png" alt="Generated world in Gazebo Harmonic" width="100%"/>
+  <img src="media/gazebo.png" alt=" Generated world in Gazebo Harmonic" width="100%"/>
 </p>
 
 <video src="https://github.com/user-attachments/assets/42289e73-c66a-4605-85c6-c95d13139d44" controls width="100%"></video>
@@ -27,6 +27,21 @@ Originally forked from [saiaravind19/gazebo_terrain_generator](https://github.co
 - Optional 3D buildings from OpenStreetMap footprints
 - Configurable spawn location — robot spawns with correct GPS coordinates at world origin
 - Downloadable zip with world file, terrain data, and optionally raw tiles
+
+---
+
+## Tested On
+
+| Component | Version |
+|---|---|
+| OS | Ubuntu 24.04.4 LTS |
+| ROS 2 | Jazzy |
+| Gazebo Sim | 8.10.0 (Harmonic) |
+| Python | 3.12.3 |
+| CPU | AMD Ryzen 5 5600X 6-Core |
+| RAM | 32 GB |
+| GPU | NVIDIA GeForce RTX 5080 16 GB |
+| GPU Driver | 590.48.01 |
 
 ---
 

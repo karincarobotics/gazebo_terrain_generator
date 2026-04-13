@@ -9,8 +9,7 @@ from utils.utils import ConcatImage
 
 # Gazebo heightmap size must be 2^n+1. Zoom 17+ always exceeds this cap via the
 # DEM→satellite upscale factor, so this is the practical output ceiling.
-MAX_HEIGHTMAP_SIZE = 4097
-
+MAX_HEIGHTMAP_SIZE = 2049
 
 class HeightmapGenerator(ConcatImage):
     def __init__(self,**kwargs):

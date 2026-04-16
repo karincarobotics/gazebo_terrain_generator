@@ -115,12 +115,11 @@ class GeoJSONToDAE:
         px = max(0, min(px, width - 1))
         py = max(0, min(py, height - 1))
 
-        # 3. Read Pixel Value (0-255)
+        # 3. Read Pixel Value
         pixel_val = self.heightmap.getpixel((px, py))
-        
+
         # 4. Convert to Local Terrain Height (Meters)
-        # Formula: (Pixel / 65535) * Total_Terrain_Z_Height  (16-bit heightmap)
-        local_z = (pixel_val / 65535.0) * self.size_z
+        local_z = (pixel_val / self.heightmap_z_resolution) * self.size_z
         
         # 5. Apply Terrain World Offset
         # The terrain model itself is shifted by terrain_pose_z in the world
@@ -219,7 +218,7 @@ class GeoJSONToDAE:
         print(f"✔ Exported: {self.output_dae}")
 
     # ---------------- ONE-SHOT ----------------
-    def run(self,origin_cords,size_z,pose_z,heightmap,boundaries):
+    def run(self, origin_cords, size_z, pose_z, heightmap, heightmap_z_resolution, boundaries):
         # Bounds are typically [South (min_lat), West (min_lon), North (max_lat), East (max_lon)]
         self.center_lat = origin_cords["latitude"]
         self.center_lon = origin_cords["longitude"]
@@ -227,6 +226,7 @@ class GeoJSONToDAE:
         self.size_z = size_z
         self.pose_z = pose_z
         self.heightmap = heightmap
+        self.heightmap_z_resolution = heightmap_z_resolution
         self.bounds = boundaries
         gdf = self.load()
         print("GeoData loaded.")

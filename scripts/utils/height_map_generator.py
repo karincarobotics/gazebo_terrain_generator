@@ -15,6 +15,7 @@ class HeightmapGenerator(ConcatImage):
     def __init__(self,**kwargs):
         super().__init__(**kwargs)
         self.heightmap = None
+        self.heightmap_z_resolution = 65535  # max pixel value; 65535 for 16-bit, 255 for 8-bit
         self.max_height = self.min_height = 0
         self.size_x=self.size_y=self.size_z=0
 
@@ -111,8 +112,10 @@ class HeightmapGenerator(ConcatImage):
         self.max_height = np.max(height_map)
         self.min_height = np.min(height_map)
 
-        # 16-bit encoding: 65535 levels vs 255 → ~0.008m precision for 534m range (vs 2.1m for 8-bit)
-        height_img_normalized = ((height_map - np.min(height_map)) / (np.max(height_map) - np.min(height_map)) * 65535).astype(np.uint16)
+        # Normalize to full pixel range. heightmap_z_resolution is 255 (8-bit) or 65535 (16-bit),
+        # set by the caller based on the target simulator's PNG heightmap support.
+        dtype = np.uint8 if self.heightmap_z_resolution == 255 else np.uint16
+        height_img_normalized = ((height_map - np.min(height_map)) / (np.max(height_map) - np.min(height_map)) * self.heightmap_z_resolution).astype(dtype)
 
         upscale_factor = 2 ** (zoomlevel - dem_resolution)
         target = min(max(height, width) * upscale_factor, MAX_HEIGHTMAP_SIZE)
@@ -130,17 +133,23 @@ class HeightmapGenerator(ConcatImage):
         terrain_data_dir = os.path.join(tile_path, 'terrain_data')
         os.makedirs(terrain_data_dir, exist_ok=True)
 
-        # Save as 16-bit PNG via cv2 (PIL 'I' mode saves 32-bit; cv2 handles uint16 correctly)
+        # cv2 writes uint8 as 8-bit PNG and uint16 as 16-bit PNG automatically
         cv2.imwrite(os.path.join(terrain_data_dir, 'height_map.png'), resized_map)
-        # Keep PIL image in memory for pixel lookups (mode 'I' stores uint16 values as int32)
-        self.heightmap = Image.fromarray(resized_map.astype(np.int32), mode='I')
+        # Keep PIL image in memory for pixel lookups
+        # 8-bit → mode 'L'; 16-bit → mode 'I' (PIL stores uint16 as int32 internally)
+        if self.heightmap_z_resolution == 255:
+            self.heightmap = Image.fromarray(resized_map, mode='L')
+        else:
+            self.heightmap = Image.fromarray(resized_map.astype(np.int32), mode='I')
 
         # Scale normal map strength proportionally to terrain range:
         # the heightmap is always normalized to 0-65535 regardless of real-world range,
         # so Sobel gradients are proportionally much stronger on flat terrain.
         # Dividing by a 100m reference keeps strength consistent across terrain types.
         terrain_range = self.max_height - self.min_height
-        normal_map = HeightmapGenerator.generate_normal_map(resized_map, strength=0.0002 * (terrain_range / 100.0))
+        # Scale strength by 65535/heightmap_z_resolution so Sobel gradients are consistent
+        # regardless of pixel range (8-bit values are 256× smaller than 16-bit ones)
+        normal_map = HeightmapGenerator.generate_normal_map(resized_map, strength=0.0002 * (terrain_range / 100.0) * (65535 / self.heightmap_z_resolution))
         cv2.imwrite(os.path.join(terrain_data_dir, 'normal_map.png'), normal_map)
 
     @staticmethod

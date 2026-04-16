@@ -653,7 +653,8 @@ main {
 }
 
 .settings-field input[type="text"],
-.settings-field input[type="number"] {
+.settings-field input[type="number"],
+.settings-field select {
     width: 100%;
     background: rgba(255, 255, 255, 0.06);
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -667,8 +668,23 @@ main {
     box-sizing: border-box;
 }
 
+.settings-field select {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='rgba(255,255,255,0.4)'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 28px;
+    cursor: pointer;
+}
+
+.settings-field select option {
+    background: #1e2d3d;
+    color: rgba(255, 255, 255, 0.9);
+}
+
 .settings-field input[type="text"]:focus,
-.settings-field input[type="number"]:focus {
+.settings-field input[type="number"]:focus,
+.settings-field select:focus {
     border-color: rgba(59, 178, 208, 0.5);
     background: rgba(255, 255, 255, 0.09);
 }

@@ -184,6 +184,28 @@ Do NOT hardcode SDF/XML blocks as Python strings. All SDF content belongs in tem
 
 ---
 
+## Target simulator versioning (`gazebo_version` / `heightmap_z_resolution`)
+
+The frontend has a "Target Gazebo Version" setting (`gazeboVersion`: `'harmonic'` or `'fortress'`).
+At the REST boundary (`server.py`), this string is translated into two typed values:
+
+- `heightmap_z_resolution: int` (65535 for Harmonic, 255 for Fortress) — controls pixel encoding
+- `gazebo_version: str` — controls version-specific SDF/GUI template selection
+
+**Rule:** Use the variable that *semantically owns* the decision:
+- Pixel encoding decisions → `heightmap_z_resolution`
+- GUI plugin template, SDF version-specific features → `gazebo_version`
+
+Do NOT compare `heightmap_z_resolution == 255` to pick a GUI template — those are correlated but
+separate concerns. A future simulator (e.g. MuJoCo) might use 8-bit heightmaps but need
+Harmonic-style GUI plugins, so conflating them would break extensibility.
+
+`gazebo_version` is written to `metadata.json` for traceability (human-readable record) but is
+**not** read back from metadata — it is always passed as a live parameter through the call chain
+to keep the system stateless.
+
+---
+
 ## Key architectural decisions
 
 ### Self-contained world file (no GAZEBO_MODEL_PATH)

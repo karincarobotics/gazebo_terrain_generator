@@ -87,10 +87,12 @@ class OrthoGenerator(ConcatImage):
 
 
 class GazeboTerrainGenerator(HeightmapGenerator, OrthoGenerator):
-    def __init__(self,tile_path:str,include_buildings: bool,**kwargs):
+    def __init__(self, tile_path: str, include_buildings: bool, heightmap_z_resolution: int, gazebo_version: str, **kwargs):
         super().__init__(**kwargs)
         self.tile_path = tile_path
         self.include_buildings = include_buildings
+        self.heightmap_z_resolution = heightmap_z_resolution
+        self.gazebo_version = gazebo_version
         with open(os.path.join(self.tile_path, 'metadata.json')) as f:
             data = json.load(f)
             self.boundaries = data["bounds"]
@@ -169,7 +171,8 @@ class GazeboTerrainGenerator(HeightmapGenerator, OrthoGenerator):
         Returns:
             None
         """
-        template = FileWriter.read_template(os.path.join(TEMPLATE_DIR, 'gazebo_world_template.sdf'))
+        template_file = 'gazebo_fortress_world_template.sdf' if self.gazebo_version == 'fortress' else 'gazebo_world_template.sdf'
+        template = FileWriter.read_template(os.path.join(TEMPLATE_DIR, template_file))
         launch_cord = self.get_launch_location()
         FileWriter.write_world_file(
             template,
@@ -276,7 +279,7 @@ class GazeboTerrainGenerator(HeightmapGenerator, OrthoGenerator):
         )
 
         # Calculate launch height and pose offset
-        launch_height = self.heightmap.getpixel((launch_px, launch_py)) * self.size_z / 65535
+        launch_height = self.heightmap.getpixel((launch_px, launch_py)) * self.size_z / self.heightmap_z_resolution
         pose_z = round(-launch_height, 2)
 
         return self.size_x,self.size_y,self.size_z,pose_x,pose_y,pose_z
@@ -308,7 +311,7 @@ class GazeboTerrainGenerator(HeightmapGenerator, OrthoGenerator):
                 output_dae_file = os.path.join(terrain_data_dir, 'buildings.dae')
                 true_boundaries = MapTileUtils.get_true_boundaries(self.boundaries.split(','), self.zoom_level)
                 geojson_to_dae = GeoJSONToDAE(street_map, output_dae_file)
-                geojson_to_dae.run(origin_coord, size_z, pose_z, self.heightmap, true_boundaries)
+                geojson_to_dae.run(origin_coord, size_z, pose_z, self.heightmap, self.heightmap_z_resolution, true_boundaries)
 
             progress("Writing world file...")
             self.gen_world(size_x, size_y, size_z, pose_x, pose_y, pose_z)

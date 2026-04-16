@@ -36,7 +36,7 @@ def bounds_from_polygon(vertices):
 	return [min(lngs), min(lats), max(lngs), max(lats)]
 
 
-def process_end_download(map_name, bounds, zoom_level, dem_resolution, include_buildings, polygon_vertices, api_key):
+def process_end_download(map_name, bounds, zoom_level, dem_resolution, include_buildings, polygon_vertices, api_key, heightmap_z_resolution, gazebo_version):
 	global task_status
 
 	def progress(msg):
@@ -56,7 +56,7 @@ def process_end_download(map_name, bounds, zoom_level, dem_resolution, include_b
 			progress("Downloading building footprint data...")
 			download_streetmap_data(true_boundaries, os.path.join(map_dir, 'building_tiles'), os.path.join(map_dir, 'terrain_data'), api_key=api_key, polygon_vertices=polygon_vertices)
 
-		terrain_generator = GazeboTerrainGenerator(map_dir, include_buildings)
+		terrain_generator = GazeboTerrainGenerator(map_dir, include_buildings, heightmap_z_resolution, gazebo_version)
 		terrain_generator.generate_gazebo_world(progress_cb=progress)
 		task_status["status"] = "completed"
 		task_status["messages"].append("World generated successfully.")
@@ -112,6 +112,7 @@ def start_download():
 	center = [(bounds[0] + bounds[2]) / 2, (bounds[1] + bounds[3]) / 2]
 	launch_location = list(map(float, postvars['launchLocation'].split(",")))
 	include_buildings = postvars.get('includeBuildings', 'true').lower() == 'true'
+	gazebo_version = postvars.get('gazeboVersion', 'harmonic')
 	dem_resolution = min(zoom_level, 13)
 
 	output_dir = get_map_dir(map_name)
@@ -128,6 +129,7 @@ def start_download():
 		"dem_resolution": dem_resolution,
 		"launch_location": ','.join(map(str, launch_location)),
 		"include_buildings": include_buildings,
+		"gazebo_version": gazebo_version,
 		"timestamp": timestamp,
 	}
 	with open(os.path.join(output_dir, 'metadata.json'), 'w') as f:
@@ -146,10 +148,12 @@ def end_download():
 	polygon_vertices = json.loads(postvars['polygonVertices'])
 	bounds = bounds_from_polygon(polygon_vertices)
 	include_buildings = postvars.get('includeBuildings', 'false').lower() == 'true'
+	gazebo_version = postvars.get('gazeboVersion')
+	heightmap_z_resolution = 255 if gazebo_version == 'fortress' else 65535
 	api_key = postvars.get('mapboxApiKey', '')
 	dem_resolution = min(zoom_level, 13)
 
-	thread = threading.Thread(target=process_end_download, args=(map_name, bounds, zoom_level, dem_resolution, include_buildings, polygon_vertices, api_key))
+	thread = threading.Thread(target=process_end_download, args=(map_name, bounds, zoom_level, dem_resolution, include_buildings, polygon_vertices, api_key, heightmap_z_resolution, gazebo_version))
 	thread.start()
 
 	return jsonify({"code": 200, "message": "Download ended"})

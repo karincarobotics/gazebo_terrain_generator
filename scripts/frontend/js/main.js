@@ -21,7 +21,8 @@
         zoomLevel: 17,
         includeBuildings: true,
         tileSource: 'https://api.mapbox.com/v4/mapbox.satellite/{z}/{x}/{y}@2x.jpg?access_token={key}',
-        parallelDownloads: 4
+        parallelDownloads: 4,
+        gazeboVersion: 'harmonic'
     };
 
     const config = loadConfig();
@@ -74,6 +75,7 @@
         document.getElementById('setting-include-buildings').checked = config.includeBuildings;
         document.getElementById('setting-tile-source').value = config.tileSource;
         document.getElementById('setting-parallel-downloads').value = config.parallelDownloads;
+        document.getElementById('setting-gazebo-version').value = config.gazeboVersion;
         updateMapboxKeyStatus(loadMapboxKey());
 
         const matchedSource = TILE_SOURCES.find(s => s && s.url === config.tileSource);
@@ -826,6 +828,7 @@
             startData.append('polygonVertices', JSON.stringify(coords));
             startData.append('launchLocation', launchLocation.join(','));
             startData.append('includeBuildings', includeBuildings);
+            startData.append('gazeboVersion', config.gazeboVersion);
             startData.append('source', source);
             const startResp = await fetch('/start-download', { method: 'POST', body: startData });
             const startResult = await startResp.json();
@@ -872,6 +875,7 @@
             endData.append('maxZoom', zoomLevel);
             endData.append('polygonVertices', JSON.stringify(coords));
             endData.append('includeBuildings', includeBuildings);
+            endData.append('gazeboVersion', config.gazeboVersion);
             endData.append('mapboxApiKey', mapboxApiKey);
             const endResp = await fetch('/end-download', { method: 'POST', body: endData });
             const endResult = await endResp.json();
@@ -1079,6 +1083,11 @@
 
         document.getElementById('setting-parallel-downloads').addEventListener('change', function () {
             config.parallelDownloads = parseInt(this.value, 10) || 4;
+            saveConfig();
+        });
+
+        document.getElementById('setting-gazebo-version').addEventListener('change', function () {
+            config.gazeboVersion = this.value;
             saveConfig();
         });
 

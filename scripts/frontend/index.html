@@ -86,6 +86,14 @@
                             <input type="number" id="setting-parallel-downloads" value="4" min="1" max="16">
                         </div>
 
+                        <div class="settings-field">
+                            <label for="setting-gazebo-version">Target Gazebo Version</label>
+                            <select id="setting-gazebo-version">
+                                <option value="harmonic">Harmonic (and above) - (16-bit heightmap)</option>
+                                <option value="fortress">Fortress / Citadel - (8-bit heightmap)</option>
+                            </select>
+                        </div>
+
                         <div class="settings-field settings-field--row">
                             <label>Mapbox API Key</label>
                             <button id="setting-mapbox-key-btn" class="mapbox-key-btn">

@@ -70,9 +70,14 @@ The Mapbox API key is stored in the browser's `localStorage` under key
 `gazebo_terrain_generator_mapbox_key` — separate from main settings so "Revert to Defaults"
 never wipes it. The frontend validates it via the Mapbox Styles API before saving.
 
-On each `/end-download` POST, the frontend sends `mapboxApiKey` in the form body.
+On each `/download-tile` POST, the frontend sends `mapboxApiKey` alongside the `source` URL template.
+The server passes the key to `Utils.download_file()` → `qualify_url()` substitutes `{key}` in the URL.
+On each `/end-download` POST, the frontend also sends `mapboxApiKey` for DEM and building downloads.
 The server passes it through to `download_dem_data()` and `download_streetmap_data()`.
 It is never stored server-side. `param.py` does NOT contain an API key.
+
+The default tile source is Mapbox Satellite (`mapbox.satellite`), using `{key}` as a placeholder
+in the URL template. `Utils.qualify_url` handles `{x}`, `{y}`, `{z}`, `{quad}`, and `{key}`.
 
 ---
 

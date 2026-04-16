@@ -80,8 +80,9 @@ class OrthoGenerator(ConcatImage):
                     cv2.putText(stitched_image, label, (text_x, text_y), font, 0.4, (0, 0, 0), 2)
                     cv2.putText(stitched_image, label, (text_x, text_y), font, 0.4, border_color, 1)
 
-        # Save the stitched image
-        compression_params = [cv2.IMWRITE_PNG_COMPRESSION, 9]
+        # Save the stitched image. Level 3 balances speed and file size —
+        # level 9 (max) is extremely slow on large images with little extra size reduction.
+        compression_params = [cv2.IMWRITE_PNG_COMPRESSION, 3]
         cv2.imwrite(os.path.join(output_dir, 'aerial.png'), stitched_image, compression_params)
 
 

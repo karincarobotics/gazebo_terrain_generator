@@ -3,6 +3,7 @@
 import os
 import urllib.error
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 
 import cv2
 import numpy as np
@@ -86,24 +87,29 @@ class ConcatImage:
         y_min = min(y for x, y in tile_map)
         y_max = max(y for x, y in tile_map)
 
-        if missing_fill is not None:
-            column_images = []
-            for x in range(x_min, x_max + 1):
-                rows = []
-                for y in range(y_min, y_max + 1):
-                    if (x, y) in tile_map:
-                        img = cv2.imread(tile_map[(x, y)])
-                        rows.append(img if img is not None else missing_fill)
-                    else:
-                        rows.append(missing_fill)
-                column_images.append(cv2.vconcat(rows))
-        else:
-            column_images = []
-            for x in range(x_min, x_max + 1):
-                rows = [cv2.imread(tile_map[(x, y)]) for y in range(y_min, y_max + 1) if (x, y) in tile_map]
-                rows = [img for img in rows if img is not None]
-                if rows:
-                    column_images.append(cv2.vconcat(rows))
+        # Read one tile to get dimensions
+        sample_img = cv2.imread(next(iter(tile_map.values())))
+        tile_h, tile_w = sample_img.shape[:2]
+        n_cols = x_max - x_min + 1
+        n_rows = y_max - y_min + 1
 
-        stitched_image = cv2.hconcat(column_images)
+        # Pre-allocate the full output buffer. np.full with a scalar is a single C memset —
+        # no temporary copies. Gray (128) fills missing tiles with no extra logic needed.
+        fill_value = missing_fill[0, 0, 0] if missing_fill is not None else 0
+        stitched_image = np.full((n_rows * tile_h, n_cols * tile_w, 3), fill_value, dtype=np.uint8)
+
+        # Each tile writes to a non-overlapping region so parallel reads are thread-safe.
+        # ThreadPoolExecutor overlaps disk I/O across cores — the main bottleneck at scale.
+        def place_tile(args):
+            (x, y), path = args
+            img = cv2.imread(path)
+            if img is None:
+                return
+            row = y - y_min
+            col = x - x_min
+            stitched_image[row * tile_h:(row + 1) * tile_h, col * tile_w:(col + 1) * tile_w] = img
+
+        with ThreadPoolExecutor() as executor:
+            executor.map(place_tile, tile_map.items())
+
         return stitched_image, tile_map, x_min, x_max, y_min, y_max

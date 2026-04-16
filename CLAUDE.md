@@ -268,6 +268,12 @@ ODE does not behave correctly with heightmaps. The world uses Bullet collision d
 **NavSat gotcha:** The current Harmonic template uses `gz-sim-navsat-system` / `gz::sim::systems::NavSat`.
 An earlier version accidentally used the `ignition::` namespace here — that was wrong for Harmonic and was corrected.
 
+**Aerial texture size limit (Fortress):** OGRE-Next 2.2.5 (shipped with Fortress/Ignition 6) has a staging
+buffer size limit that causes a hard crash (`GL3PlusDynamicBuffer::map` assertion failure) when the aerial
+texture exceeds roughly 16384px in either dimension. At zoom 17 with 512×512 tiles, ~1000 tiles already
+produces a ~16000px image. The user-facing fix is to reduce zoom level. No code cap is applied — zoom
+level is already the natural knob for controlling output size.
+
 ---
 
 ## param.py — what belongs there

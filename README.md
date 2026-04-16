@@ -1,6 +1,6 @@
 # Gazebo Terrain Generator
 
-A web-based tool that generates self-contained [Gazebo Harmonic](https://gazebosim.org/docs/harmonic/) worlds from real-world satellite imagery and elevation data. Draw a polygon on a map, set a spawn location, and get a ready-to-use `.world` file with a textured heightmap and optional 3D buildings.
+A web-based tool that generates self-contained Gazebo worlds from real-world satellite imagery and elevation data. Draw a polygon on a map, set a spawn location, and get a ready-to-use `.world` file with a textured heightmap and optional 3D buildings. Supports [Gazebo Harmonic](https://gazebosim.org/docs/harmonic/) and [Gazebo Fortress](https://gazebosim.org/docs/fortress/).
 
 Developed by [Karinca Robotics](https://karinca.com.tr) for [Polymath Robotics](https://polymathrobotics.com).
 Originally forked from [saiaravind19/gazebo_terrain_generator](https://github.com/saiaravind19/gazebo_terrain_generator).
@@ -10,7 +10,7 @@ Originally forked from [saiaravind19/gazebo_terrain_generator](https://github.co
 </p>
 
 <p align="center">
-  <img src="media/gazebo.png" alt=" Generated world in Gazebo Harmonic" width="100%"/>
+  <img src="media/gazebo.png" alt="Generated world in Gazebo" width="100%"/>
 </p>
 
 <video src="https://github.com/user-attachments/assets/42289e73-c66a-4605-85c6-c95d13139d44" controls width="100%"></video>
@@ -22,7 +22,7 @@ Originally forked from [saiaravind19/gazebo_terrain_generator](https://github.co
 - Draw a polygon on a live satellite map to select any area on Earth
 - Real-world elevation data via Mapbox Terrain-DEM-v1 (SRTM ~30m resolution)
 - Satellite imagery texture stitched from configurable tile sources
-- 16-bit heightmap for ~0.008m elevation precision
+- 16-bit heightmap for ~0.008m elevation precision (8-bit for Fortress compatibility)
 - Normal map generated from heightmap gradients for realistic terrain shading
 - Optional 3D buildings from OpenStreetMap footprints
 - Configurable spawn location — robot spawns with correct GPS coordinates at world origin
@@ -37,6 +37,7 @@ Originally forked from [saiaravind19/gazebo_terrain_generator](https://github.co
 | OS | Ubuntu 24.04.4 LTS |
 | ROS 2 | Jazzy |
 | Gazebo Sim | 8.10.0 (Harmonic) |
+| Gazebo Sim | 6.x (Fortress, Docker) |
 | Python | 3.12.3 |
 | CPU | AMD Ryzen 5 5600X 6-Core |
 | RAM | 32 GB |
@@ -48,7 +49,7 @@ Originally forked from [saiaravind19/gazebo_terrain_generator](https://github.co
 ## Requirements
 
 - Python 3.12+
-- [Gazebo Harmonic](https://gazebosim.org/docs/harmonic/install_ubuntu/) or above
+- [Gazebo Harmonic](https://gazebosim.org/docs/harmonic/install_ubuntu/) or above, **or** [Gazebo Fortress](https://gazebosim.org/docs/fortress/install_ubuntu/)
 - A [Mapbox account](https://www.mapbox.com/) with a public access token (free tier is sufficient)
 
 ---
@@ -112,6 +113,7 @@ The key is never stored server-side.
 | Include Buildings | On | Download OSM building footprints and extrude as 3D meshes |
 | Map Tile Source | Bing Aerial | Satellite tile provider URL template |
 | Parallel Downloads | 4 | Concurrent tile download threads |
+| Target Gazebo Version | Harmonic (and above) | Controls heightmap bit depth and world file format. Use **Fortress / Citadel** for Ignition 6 |
 
 ---
 
@@ -125,7 +127,7 @@ Generated files are stored under `/tmp/gazebo_terrain_generator/{world_name}/`:
   metadata.json           — generation parameters (bounds, zoom, spawn location, etc.)
   terrain_data/
     aerial.png            — stitched satellite texture
-    height_map.png        — 16-bit grayscale heightmap
+    height_map.png        — grayscale heightmap (16-bit for Harmonic, 8-bit for Fortress)
     normal_map.png        — normal map derived from heightmap
     buildings.dae         — 3D building mesh (if buildings enabled and OSM data exists)
     buildings.geojson     — raw building footprints (if buildings enabled)
@@ -138,17 +140,19 @@ Generated files are stored under `/tmp/gazebo_terrain_generator/{world_name}/`:
 
 ## Opening in Gazebo
 
-Run directly:
+**Gazebo Harmonic (and above):**
 
 ```bash
 gz sim /tmp/gazebo_terrain_generator/{world_name}/{world_name}.world
 ```
 
-Or unzip the downloaded archive anywhere and run:
+**Gazebo Fortress:**
 
 ```bash
-gz sim {world_name}/{world_name}.world
+ign gazebo /tmp/gazebo_terrain_generator/{world_name}/{world_name}.world
 ```
+
+Or unzip the downloaded archive anywhere and run the appropriate command above with the local path.
 
 ---
 

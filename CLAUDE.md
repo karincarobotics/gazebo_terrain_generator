@@ -11,7 +11,7 @@ A web-based tool that generates a Gazebo world from real-world satellite and ter
 The user draws a polygon on a map, selects a zoom level and launch location, and the tool:
 1. Downloads satellite tiles (Mapbox) and DEM tiles (Mapbox Terrain-DEM-v1) for the selected area
 2. Stitches satellite tiles into an aerial texture (`aerial.png`)
-3. Generates a normalized 16-bit grayscale heightmap (`height_map.png`) for Gazebo
+3. Generates a normalized heightmap (`height_map.png`) — 16-bit for Harmonic, 8-bit for Fortress
 4. Generates a normal map (`normal_map.png`) derived from heightmap gradients
 5. Optionally downloads and converts OSM buildings to a 3D mesh (`buildings.dae`)
 6. Writes a self-contained Gazebo world file (`{model_name}.world`)
@@ -25,13 +25,13 @@ The generated world is fully self-contained — no `GAZEBO_MODEL_PATH` or enviro
 ```
 /tmp/gazebo_terrain_generator/{model_name}/
   metadata.json          — polygon_vertices, bounds, center, zoom_level, dem_resolution,
-                           launch_location, include_buildings, timestamp
+                           launch_location, include_buildings, gazebo_version, timestamp
   tiles/[zoom,y,x].png   — flat satellite tiles
   dem/[zoom,y,x].png     — flat DEM tiles (zoom = min(satellite_zoom, 13))
   building_tiles/        — Mapbox vector tile cache for buildings (zoom/x/y.json)
   terrain_data/
     aerial.png            — stitched satellite image (square-padded)
-    height_map.png        — normalized 16-bit grayscale heightmap (2^n+1 size for Gazebo)
+    height_map.png        — normalized heightmap (2^n+1 size); 16-bit PNG for Harmonic, 8-bit for Fortress
     normal_map.png        — normal map derived from heightmap (Sobel gradients)
     buildings.dae         — only if include_buildings=True and OSM data exists
     buildings.geojson     — only if include_buildings=True
@@ -252,6 +252,24 @@ ODE does not behave correctly with heightmaps. The world uses Bullet collision d
 
 ---
 
+## Fortress vs Harmonic SDF differences
+
+| Concern | Harmonic (gz-sim 8+) | Fortress (Ignition 6) |
+|---|---|---|
+| System plugin prefix | `gz-sim-*-system` / `gz::sim::systems::` | `ignition-gazebo-*-system` / `ignition::gazebo::systems::` |
+| GUI config tag | `<gz-gui>` | `<ignition-gui>` |
+| 3D scene plugin | `MinimalScene` + `GzSceneManager` (two plugins) | `GzScene3D` (single plugin — handles both) |
+| World stats GUI plugin | `WorldStats` | `WorldStats` (same — `WorldStatistics` does NOT exist in Fortress) |
+| Heightmap bit depth | 16-bit PNG (65535 levels) | 8-bit PNG (255 levels) — Fortress Image.cc misparses 16-bit stride |
+| `<sky><clouds>` | Supported | Removed — cloud rendering incomplete in Fortress OGRE2 |
+| `<camera_clip>` in MinimalScene/GzScene3D | Respected | Ignored by GzScene3D in Fortress |
+| `VisualizationCapabilities` GUI plugin | Exists | Does not exist (introduced in Garden) |
+
+**NavSat gotcha:** The current Harmonic template uses `gz-sim-navsat-system` / `gz::sim::systems::NavSat`.
+An earlier version accidentally used the `ignition::` namespace here — that was wrong for Harmonic and was corrected.
+
+---
+
 ## param.py — what belongs there
 
 `param.py` only contains debug/tuning flags that apply globally:
@@ -275,7 +293,7 @@ scripts/
     param.py                     — Debug flags only: DEBUG_TILE_BORDERS, DEBUG_SPHERE
     dem_tiles_downloader.py      — Downloads Mapbox DEM tiles as flat [zoom,y,x].png
     gazebo_world_generator.py    — OrthoGenerator, GazeboTerrainGenerator; main pipeline entry point
-    height_map_generator.py      — Stitches DEM tiles, generates height_map.png (16-bit) + normal_map.png; get_amsl()
+    height_map_generator.py      — Stitches DEM tiles, generates height_map.png (16-bit or 8-bit) + normal_map.png; get_amsl()
     file_writer.py               — read_template(), write_world_file(); TEMPLATE_DIR constant
     buildings_generator.py       — GeoJSON → .dae conversion
     building_downloader.py       — OSM buildings GeoJSON downloader; BUILDING_TILE_ZOOM=15
@@ -286,7 +304,8 @@ scripts/
     js/main.js                   — Mapbox GL JS, polygon draw, launch pin, geocoding search, POST to server
     css/main.css
 templates/
-  gazebo_world_template.sdf      — Full world file template with GUI plugin list
-  building_template.sdf          — Buildings model block (conditional on buildings.dae existing)
-  debug_sphere_template.sdf      — Red debug sphere model (conditional on DEBUG_SPHERE flag)
+  gazebo_world_template.sdf         — Harmonic (gz-sim 8+) world template; gz-sim-* plugins, gz-gui, MinimalScene+GzSceneManager
+  gazebo_fortress_world_template.sdf — Fortress (Ignition 6) world template; ignition-gazebo-* plugins, ignition-gui, GzScene3D
+  building_template.sdf             — Buildings model block (conditional on buildings.dae existing)
+  debug_sphere_template.sdf         — Red debug sphere model (conditional on DEBUG_SPHERE flag)
 ```

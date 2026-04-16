@@ -20,13 +20,15 @@
     const DEFAULT_CONFIG = {
         zoomLevel: 17,
         includeBuildings: true,
-        tileSource: 'http://ecn.t0.tiles.virtualearth.net/tiles/a{quad}.jpeg?g=129&mkt=en&stl=H',
+        tileSource: 'https://api.mapbox.com/v4/mapbox.satellite/{z}/{x}/{y}@2x.jpg?access_token={key}',
         parallelDownloads: 4
     };
 
     const config = loadConfig();
 
     const TILE_SOURCES = [
+        { label: 'Mapbox Satellite', url: 'https://api.mapbox.com/v4/mapbox.satellite/{z}/{x}/{y}@2x.jpg?access_token={key}' },
+        null,
         { label: 'Bing Maps', url: 'http://ecn.t0.tiles.virtualearth.net/tiles/r{quad}.jpeg?g=129&mkt=en&stl=H' },
         { label: 'Bing Maps Satellite', url: 'http://ecn.t0.tiles.virtualearth.net/tiles/a{quad}.jpeg?g=129&mkt=en&stl=H' },
         { label: 'Bing Maps Hybrid', url: 'http://ecn.t0.tiles.virtualearth.net/tiles/h{quad}.jpeg?g=129&mkt=en&stl=H' },
@@ -65,6 +67,7 @@
             console.warn('Failed to save settings to localStorage:', e);
         }
     }
+
 
     function applyConfigToForm() {
         document.getElementById('setting-zoom-level').value = config.zoomLevel;
@@ -844,6 +847,7 @@
             tileData.append('z', tile.z);
             tileData.append('mapName', modelName);
             tileData.append('source', source);
+            tileData.append('mapboxApiKey', mapboxApiKey);
 
             try {
                 const resp = await fetch('/download-tile', { method: 'POST', body: tileData });

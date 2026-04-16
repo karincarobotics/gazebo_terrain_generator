@@ -24,20 +24,21 @@ class Utils:
         return quadkey
 
     @staticmethod
-    def qualify_url(url, x, y, z):
+    def qualify_url(url, x, y, z, api_key=''):
         replace_map = {
             "x": str(x),
             "y": str(y),
             "z": str(z),
             "quad": Utils.make_quad_key(x, y, z),
+            "key": api_key,
         }
-        for key, value in replace_map.items():
-            url = url.replace(f"{{{key}}}", value)
+        for k, value in replace_map.items():
+            url = url.replace(f"{{{k}}}", value)
         return url
 
     @staticmethod
-    def download_file(url, destination, x, y, z):
-        url = Utils.qualify_url(url, x, y, z)
+    def download_file(url, destination, x, y, z, api_key=''):
+        url = Utils.qualify_url(url, x, y, z, api_key)
         try:
             urllib.request.urlretrieve(url, destination)
             return 200

@@ -85,6 +85,7 @@ def download_tile():
 	zoom = int(postvars['z'])
 	map_name = str(postvars['mapName'])
 	source = str(postvars['source'])
+	api_key = str(postvars.get('mapboxApiKey', ''))
 
 	file_path = os.path.join(get_map_dir(map_name), 'tiles', f"[{zoom},{y},{x}].png")
 
@@ -92,7 +93,7 @@ def download_tile():
 		return jsonify({"code": 200, "message": "Tile already exists"})
 
 	os.makedirs(os.path.dirname(file_path), exist_ok=True)
-	code = Utils.download_file(source, file_path, x, y, zoom)
+	code = Utils.download_file(source, file_path, x, y, zoom, api_key)
 
 	if code == 200:
 		return jsonify({"code": 200, "message": "Tile downloaded"})

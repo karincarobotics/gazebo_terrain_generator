@@ -591,6 +591,19 @@ main {
     right: 0;
 }
 
+/* Shift right-anchored map overlays clear of the settings panel when open */
+#map.settings-open .mapboxgl-ctrl-top-right,
+#map.settings-open .mapboxgl-ctrl-bottom-right,
+#map.settings-open .texture-size-info {
+    transform: translateX(-310px);
+}
+
+.mapboxgl-ctrl-top-right,
+.mapboxgl-ctrl-bottom-right,
+.texture-size-info {
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 .settings-header {
     display: flex;
     align-items: center;
@@ -639,10 +652,6 @@ main {
     letter-spacing: 1.2px;
     text-transform: uppercase;
     margin: 24px 0 10px 0;
-}
-
-.settings-field {
-    margin-bottom: 14px;
 }
 
 .settings-field > label {
@@ -853,18 +862,84 @@ main {
     margin: 3px 0;
 }
 
+/* Settings tooltip icon.
+   Tooltip is anchored to .settings-field (position: relative) so it spans the full
+   field width and stays within the panel — avoids clipping from overflow-x: hidden. */
+.settings-field {
+    margin-bottom: 14px;
+    position: relative;
+}
+
+.tooltip-icon {
+    /* No position: relative here — ::after positions relative to .settings-field */
+    display: inline-block;
+    margin-left: 5px;
+    color: rgba(255, 255, 255, 0.2);
+    font-size: 12px;
+    cursor: default;
+    vertical-align: middle;
+    line-height: 1;
+}
+
+.tooltip-icon:hover {
+    color: rgba(255, 255, 255, 0.55);
+}
+
+.tooltip-icon:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    top: 22px;   /* below the label row (~12px font + 4px gap) */
+    left: 0;
+    right: 0;
+    width: auto; /* span full field width, no horizontal overflow */
+    background: #0d1117;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 6px;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 11px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-weight: normal;
+    font-style: normal;
+    padding: 8px 10px;
+    white-space: normal;
+    line-height: 1.5;
+    z-index: 600;
+    pointer-events: none;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+
 /* Texture/heightmap size estimate info */
 .texture-size-info {
-    margin-top: 6px;
-    font-size: 10px;
+    position: absolute;
+    bottom: 28px;
+    right: 10px;
+    background: rgba(20, 20, 20, 0.72);
+    backdrop-filter: blur(6px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    padding: 8px 11px;
+    font-size: 11px;
     font-family: monospace;
-    color: rgba(255, 255, 255, 0.35);
-    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.75);
+    line-height: 1.7;
+    white-space: pre;
+    pointer-events: none;
     display: none;
+    z-index: 5;
 }
 
 .texture-size-info.visible {
     display: block;
+}
+
+.texture-size-info-title {
+    display: block;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: rgba(255, 255, 255, 0.38);
+    margin-bottom: 3px;
+    font-family: sans-serif;
 }
 
 /* Responsive design */

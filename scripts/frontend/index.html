@@ -47,6 +47,8 @@
                     </button>
                 </div>
 
+                <div id="texture-size-info" class="texture-size-info"></div>
+
                 <div id="settings-panel" class="settings-panel">
                     <div class="settings-header">
                         <span class="settings-title">Settings</span>
@@ -57,12 +59,12 @@
                     <div class="settings-body">
 
                         <div class="settings-field">
-                            <label for="setting-zoom-level">Zoom Level</label>
+                            <label for="setting-zoom-level">Zoom Level <i class="fas fa-circle-info tooltip-icon" data-tooltip="Satellite tile resolution. Higher = more detail, more tiles to download. Affects texture quality in Gazebo."></i></label>
                             <input type="number" id="setting-zoom-level" value="17" min="1" max="22">
                         </div>
 
                         <div class="settings-field settings-field--row">
-                            <label for="setting-include-buildings">Include Buildings</label>
+                            <label for="setting-include-buildings">Include Buildings <i class="fas fa-circle-info tooltip-icon" data-tooltip="Downloads OSM building footprints and extrudes them as 3D meshes. Increases generation time in dense urban areas."></i></label>
                             <label class="toggle-switch">
                                 <input type="checkbox" id="setting-include-buildings" checked>
                                 <span class="toggle-slider"></span>
@@ -70,7 +72,7 @@
                         </div>
 
                         <div class="settings-field">
-                            <label>Map Tile Source</label>
+                            <label>Map Tile Source <i class="fas fa-circle-info tooltip-icon" data-tooltip="Satellite tile provider URL. Use {x}, {y}, {z} or {quad} as placeholders. Check provider terms before commercial use."></i></label>
                             <div class="source-field">
                                 <button id="setting-source-display" class="source-display-btn" title="Click to change source"></button>
                                 <button id="setting-source-presets-btn" title="Select from presets">
@@ -82,12 +84,12 @@
                         </div>
 
                         <div class="settings-field">
-                            <label for="setting-parallel-downloads">Parallel Downloads</label>
+                            <label for="setting-parallel-downloads">Parallel Downloads <i class="fas fa-circle-info tooltip-icon" data-tooltip="Concurrent tile download threads. Higher values speed up downloads but may trigger provider rate limiting."></i></label>
                             <input type="number" id="setting-parallel-downloads" value="4" min="1" max="16">
                         </div>
 
                         <div class="settings-field">
-                            <label for="setting-gazebo-version">Target Gazebo Version</label>
+                            <label for="setting-gazebo-version">Target Gazebo Version <i class="fas fa-circle-info tooltip-icon" data-tooltip="Harmonic uses 16-bit heightmaps (65535 elevation levels). Fortress uses 8-bit (255 levels) due to a loader limitation in Ignition 6."></i></label>
                             <select id="setting-gazebo-version">
                                 <option value="harmonic">Harmonic (and above) - (16-bit heightmap)</option>
                                 <option value="fortress">Fortress / Citadel - (8-bit heightmap)</option>
@@ -95,15 +97,14 @@
                         </div>
 
                         <div class="settings-field">
-                            <label for="setting-target-heightmap-size">Target Heightmap Size</label>
+                            <label for="setting-target-heightmap-size">Target Heightmap Size <i class="fas fa-circle-info tooltip-icon" data-tooltip="Output resolution of the heightmap PNG (must be 2^n+1). Auto picks the nearest valid size to raw DEM pixels. Larger sizes add interpolated detail. 4097x4097 requires a high-memory GPU."></i></label>
                             <select id="setting-target-heightmap-size">
                                 <option value="auto">Auto (nearest to DEM resolution)</option>
                             </select>
-                            <div id="texture-size-info" class="texture-size-info"></div>
                         </div>
 
                         <div class="settings-field settings-field--row">
-                            <label>Mapbox API Key</label>
+                            <label>Mapbox API Key <i class="fas fa-circle-info tooltip-icon" data-tooltip="Required for satellite imagery, elevation data, and geocoding. Stored in your browser only - never sent to this server."></i></label>
                             <button id="setting-mapbox-key-btn" class="mapbox-key-btn">
                                 <span id="setting-mapbox-key-status">Not set</span>
                                 <i class="fas fa-edit"></i>

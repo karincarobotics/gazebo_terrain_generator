@@ -646,7 +646,9 @@
         settingsButton.title = 'Settings';
         settingsButton.innerHTML = '<i class="fas fa-cog"></i>';
         settingsButton.onclick = function () {
-            document.getElementById('settings-panel').classList.toggle('open');
+            const panel = document.getElementById('settings-panel');
+            panel.classList.toggle('open');
+            document.getElementById('map').classList.toggle('settings-open', panel.classList.contains('open'));
         };
 
         controlContainer.appendChild(drawButton);
@@ -1047,13 +1049,30 @@
         }
     }
 
+    // Last successful estimate result — re-rendered when dropdown selection changes
+    let lastEstimateResult = null;
+
+    // Render the estimate info div from a cached result object
+    function renderEstimateInfo(result) {
+        const infoEl = document.getElementById('texture-size-info');
+        if (!result) return;
+        const isAuto = config.targetHeightmapSize === 'auto';
+        const resolvedSize = isAuto ? result.auto_heightmap_size : parseInt(config.targetHeightmapSize, 10);
+        const modeLabel = isAuto ? 'Auto' : 'Fixed';
+        const hmLine = 'Heightmap: ' + result.natural_heightmap_width + 'x' + result.natural_heightmap_height + 'px -> ' + modeLabel + ': ' + resolvedSize + 'x' + resolvedSize;
+        const texLine = 'Texture: ~' + result.natural_texture_padded + 'x' + result.natural_texture_padded + 'px';
+        infoEl.innerHTML = '<span class="texture-size-info-title">Estimated output sizes</span>' + hmLine + '\n' + texLine;
+        infoEl.classList.add('visible');
+    }
+
     // Fetch and display heightmap + texture size estimates from the server
     async function updateTextureSizeEstimate() {
         const infoEl = document.getElementById('texture-size-info');
         const features = draw.getAll().features;
         if (features.length === 0) {
-            infoEl.textContent = '';
+            infoEl.innerHTML = '';
             infoEl.classList.remove('visible');
+            lastEstimateResult = null;
             return;
         }
         const coords = features[0].geometry.coordinates[0];
@@ -1065,10 +1084,8 @@
             const resp = await fetch('/estimate-texture-sizes', { method: 'POST', body: data });
             const result = await resp.json();
             if (result.code === 200) {
-                const hmLine = 'Heightmap: ' + result.natural_heightmap_width + 'x' + result.natural_heightmap_height + 'px -> Auto: ' + result.auto_heightmap_size + 'x' + result.auto_heightmap_size;
-                const texLine = 'Texture: ~' + result.natural_texture_padded + 'x' + result.natural_texture_padded + 'px';
-                infoEl.textContent = hmLine + '\n' + texLine;
-                infoEl.classList.add('visible');
+                lastEstimateResult = result;
+                renderEstimateInfo(result);
             }
         } catch (e) {
             console.warn('Size estimate failed:', e);
@@ -1125,6 +1142,7 @@
         // Close panel button
         document.getElementById('settings-close-btn').addEventListener('click', function () {
             document.getElementById('settings-panel').classList.remove('open');
+            document.getElementById('map').classList.remove('settings-open');
         });
 
         // Sync config on input change
@@ -1153,6 +1171,7 @@
         document.getElementById('setting-target-heightmap-size').addEventListener('change', function () {
             config.targetHeightmapSize = this.value;
             saveConfig();
+            renderEstimateInfo(lastEstimateResult);
         });
 
         document.getElementById('setting-mapbox-key-btn').addEventListener('click', function () {

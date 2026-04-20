@@ -7,9 +7,8 @@ from utils.maptile_utils import MapTileUtils
 from utils.utils import ConcatImage
 
 
-# Gazebo heightmap size must be 2^n+1. Zoom 17+ always exceeds this cap via the
-# DEM→satellite upscale factor, so this is the practical output ceiling.
-MAX_HEIGHTMAP_SIZE = 2049
+# Valid Gazebo heightmap sizes (must be 2^n+1). Used for dropdown options and auto-sizing.
+VALID_HEIGHTMAP_SIZES = [257, 513, 1025, 2049, 4097]
 
 class HeightmapGenerator(ConcatImage):
     def __init__(self,**kwargs):
@@ -73,18 +72,22 @@ class HeightmapGenerator(ConcatImage):
 
 
     @staticmethod
-    def get_nearest_map_size(height, width):
+    def get_nearest_map_size(dim):
         """
-        Return the nearest valid Gazebo heightmap size (2^n + 1) that fits the given dimensions.
-        Gazebo requires heightmap dimensions to be 2^n + 1 (e.g. 129, 257, 513, 1025...).
+        Return the nearest valid Gazebo heightmap size (2^n + 1) to the given dimension.
+        Valid sizes are defined in VALID_HEIGHTMAP_SIZES. Clamps to [257, 4097].
         """
-        value = max(height, width)
-        n = math.log2(value - 1)
-        n_ceil = int(math.ceil(n))
-        return (2 ** n_ceil) + 1
+        if dim <= 1:
+            return VALID_HEIGHTMAP_SIZES[0]
+        n = math.log2(max(dim - 1, 1))
+        lower = (2 ** int(math.floor(n))) + 1
+        upper = (2 ** int(math.ceil(n))) + 1
+        lower = max(lower, VALID_HEIGHTMAP_SIZES[0])
+        upper = min(upper, VALID_HEIGHTMAP_SIZES[-1])
+        return lower if abs(dim - lower) <= abs(dim - upper) else upper
 
 
-    def generate_rgb_heightmap(self, tile_path, boundaries, zoomlevel, dem_path: str, dem_resolution: int) -> None:
+    def generate_rgb_heightmap(self, tile_path, boundaries, zoomlevel, dem_path: str, dem_resolution: int, target_heightmap_size: int) -> None:
 
         #get the true boundaries — there is non-uniform padding added by tile alignment
         bound_array = boundaries.split(',')
@@ -117,9 +120,7 @@ class HeightmapGenerator(ConcatImage):
         dtype = np.uint8 if self.heightmap_z_resolution == 255 else np.uint16
         height_img_normalized = ((height_map - np.min(height_map)) / (np.max(height_map) - np.min(height_map)) * self.heightmap_z_resolution).astype(dtype)
 
-        upscale_factor = 2 ** (zoomlevel - dem_resolution)
-        target = min(max(height, width) * upscale_factor, MAX_HEIGHTMAP_SIZE)
-        size = HeightmapGenerator.get_nearest_map_size(int(target), int(target))
+        size = target_heightmap_size
         # INTER_LINEAR avoids ringing artifacts that INTER_CUBIC introduces around
         # sharp SRTM quantization steps (~1m vertical steps on steep slopes)
         resized_map = cv2.resize(height_img_normalized, (size, size), interpolation=cv2.INTER_LINEAR)

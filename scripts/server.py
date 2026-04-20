@@ -14,6 +14,7 @@ from utils.building_downloader import download_streetmap_data
 from utils.utils import Utils
 from utils.gazebo_world_generator import GazeboTerrainGenerator
 from utils.maptile_utils import MapTileUtils
+from utils.height_map_generator import HeightmapGenerator, VALID_HEIGHTMAP_SIZES
 
 app = Flask(__name__)
 lock = threading.Lock()
@@ -36,7 +37,16 @@ def bounds_from_polygon(vertices):
 	return [min(lngs), min(lats), max(lngs), max(lats)]
 
 
-def process_end_download(map_name, bounds, zoom_level, dem_resolution, include_buildings, polygon_vertices, api_key, heightmap_z_resolution, gazebo_version):
+def compute_auto_heightmap_size(bounds, dem_resolution):
+	"""Return the nearest valid 2^n+1 heightmap size to the natural DEM tile dimensions."""
+	dem_tiles = MapTileUtils.get_max_tilenumber(bounds, dem_resolution)
+	x_count = dem_tiles['northeast'][0] - dem_tiles['northwest'][0] + 1
+	y_count = dem_tiles['southwest'][1] - dem_tiles['northwest'][1] + 1
+	natural_max = max(x_count * 512, y_count * 512)
+	return HeightmapGenerator.get_nearest_map_size(natural_max)
+
+
+def process_end_download(map_name, bounds, zoom_level, dem_resolution, include_buildings, polygon_vertices, api_key, heightmap_z_resolution, gazebo_version, target_heightmap_size):
 	global task_status
 
 	def progress(msg):
@@ -46,6 +56,15 @@ def process_end_download(map_name, bounds, zoom_level, dem_resolution, include_b
 	try:
 		task_status["status"] = "in_progress"
 		map_dir = get_map_dir(map_name)
+
+		# Write resolved target_heightmap_size to metadata for traceability
+		metadata_path = os.path.join(map_dir, 'metadata.json')
+		with open(metadata_path) as f:
+			meta = json.load(f)
+		meta['target_heightmap_size'] = target_heightmap_size
+		with open(metadata_path, 'w') as f:
+			json.dump(meta, f, indent=2)
+
 		true_boundaries = MapTileUtils.get_true_boundaries(bounds, zoom_level)
 
 		progress("Downloading elevation data (DEM)...")
@@ -56,7 +75,7 @@ def process_end_download(map_name, bounds, zoom_level, dem_resolution, include_b
 			progress("Downloading building footprint data...")
 			download_streetmap_data(true_boundaries, os.path.join(map_dir, 'building_tiles'), os.path.join(map_dir, 'terrain_data'), api_key=api_key, polygon_vertices=polygon_vertices)
 
-		terrain_generator = GazeboTerrainGenerator(map_dir, include_buildings, heightmap_z_resolution, gazebo_version)
+		terrain_generator = GazeboTerrainGenerator(map_dir, include_buildings, heightmap_z_resolution, gazebo_version, target_heightmap_size)
 		terrain_generator.generate_gazebo_world(progress_cb=progress)
 		task_status["status"] = "completed"
 		task_status["messages"].append("World generated successfully.")
@@ -113,6 +132,7 @@ def start_download():
 	launch_location = list(map(float, postvars['launchLocation'].split(",")))
 	include_buildings = postvars.get('includeBuildings', 'true').lower() == 'true'
 	gazebo_version = postvars.get('gazeboVersion', 'harmonic')
+	target_heightmap_size_raw = postvars.get('targetHeightmapSize', 'auto')
 	dem_resolution = min(zoom_level, 13)
 
 	output_dir = get_map_dir(map_name)
@@ -130,6 +150,7 @@ def start_download():
 		"launch_location": ','.join(map(str, launch_location)),
 		"include_buildings": include_buildings,
 		"gazebo_version": gazebo_version,
+		"target_heightmap_size_setting": target_heightmap_size_raw,
 		"timestamp": timestamp,
 	}
 	with open(os.path.join(output_dir, 'metadata.json'), 'w') as f:
@@ -153,10 +174,56 @@ def end_download():
 	api_key = postvars.get('mapboxApiKey', '')
 	dem_resolution = min(zoom_level, 13)
 
-	thread = threading.Thread(target=process_end_download, args=(map_name, bounds, zoom_level, dem_resolution, include_buildings, polygon_vertices, api_key, heightmap_z_resolution, gazebo_version))
+	target_heightmap_size_raw = postvars.get('targetHeightmapSize', 'auto')
+	if target_heightmap_size_raw == 'auto':
+		target_heightmap_size = compute_auto_heightmap_size(bounds, dem_resolution)
+	else:
+		target_heightmap_size = int(target_heightmap_size_raw)
+
+	thread = threading.Thread(target=process_end_download, args=(map_name, bounds, zoom_level, dem_resolution, include_buildings, polygon_vertices, api_key, heightmap_z_resolution, gazebo_version, target_heightmap_size))
 	thread.start()
 
 	return jsonify({"code": 200, "message": "Download ended"})
+
+
+@app.route('/valid-heightmap-sizes', methods=['GET'])
+def valid_heightmap_sizes():
+	return jsonify({"code": 200, "sizes": VALID_HEIGHTMAP_SIZES})
+
+
+@app.route('/estimate-texture-sizes', methods=['POST'])
+def estimate_texture_sizes():
+	postvars = request.form
+	polygon_vertices = json.loads(postvars['polygonVertices'])
+	zoom_level = int(postvars['zoomLevel'])
+	tile_source = postvars.get('tileSource', '')
+	dem_resolution = min(zoom_level, 13)
+	bounds = bounds_from_polygon(polygon_vertices)
+
+	# DEM tiles from Mapbox terrain-dem-v1 are 512×512px
+	dem_tiles = MapTileUtils.get_max_tilenumber(bounds, dem_resolution)
+	dem_x_count = dem_tiles['northeast'][0] - dem_tiles['northwest'][0] + 1
+	dem_y_count = dem_tiles['southwest'][1] - dem_tiles['northwest'][1] + 1
+	natural_hm_w = dem_x_count * 512
+	natural_hm_h = dem_y_count * 512
+
+	# Satellite tiles: 512px if @2x URL, 256px otherwise
+	sat_tile_px = 512 if '@2x' in tile_source else 256
+	sat_tiles = MapTileUtils.get_max_tilenumber(bounds, zoom_level)
+	sat_x_count = sat_tiles['northeast'][0] - sat_tiles['northwest'][0] + 1
+	sat_y_count = sat_tiles['southwest'][1] - sat_tiles['northwest'][1] + 1
+	natural_tex_padded = max(sat_x_count * sat_tile_px, sat_y_count * sat_tile_px)
+
+	auto_size = HeightmapGenerator.get_nearest_map_size(max(natural_hm_w, natural_hm_h))
+
+	return jsonify({
+		"code": 200,
+		"natural_heightmap_width": natural_hm_w,
+		"natural_heightmap_height": natural_hm_h,
+		"auto_heightmap_size": auto_size,
+		"valid_heightmap_sizes": VALID_HEIGHTMAP_SIZES,
+		"natural_texture_padded": natural_tex_padded
+	})
 
 
 @app.route('/download-world', methods=['GET'])

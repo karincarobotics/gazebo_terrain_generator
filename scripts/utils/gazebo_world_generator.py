@@ -88,12 +88,13 @@ class OrthoGenerator(ConcatImage):
 
 
 class GazeboTerrainGenerator(HeightmapGenerator, OrthoGenerator):
-    def __init__(self, tile_path: str, include_buildings: bool, heightmap_z_resolution: int, gazebo_version: str, **kwargs):
+    def __init__(self, tile_path: str, include_buildings: bool, heightmap_z_resolution: int, gazebo_version: str, target_heightmap_size: int, **kwargs):
         super().__init__(**kwargs)
         self.tile_path = tile_path
         self.include_buildings = include_buildings
         self.heightmap_z_resolution = heightmap_z_resolution
         self.gazebo_version = gazebo_version
+        self.target_heightmap_size = target_heightmap_size
         with open(os.path.join(self.tile_path, 'metadata.json')) as f:
             data = json.load(f)
             self.boundaries = data["bounds"]
@@ -299,7 +300,7 @@ class GazeboTerrainGenerator(HeightmapGenerator, OrthoGenerator):
             self.generate_ortho(self.tile_path, self.zoom_level)
 
             progress("Processing heightmap...")
-            self.generate_rgb_heightmap(self.tile_path, self.boundaries, self.zoom_level, os.path.join(self.tile_path, 'dem'), self.dem_resolution)
+            self.generate_rgb_heightmap(self.tile_path, self.boundaries, self.zoom_level, os.path.join(self.tile_path, 'dem'), self.dem_resolution, self.target_heightmap_size)
 
             progress("Computing world dimensions...")
             (size_x, size_y, size_z, pose_x, pose_y, pose_z) = self.get_world_dimensions()

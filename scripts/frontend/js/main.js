@@ -22,7 +22,8 @@
         includeBuildings: true,
         tileSource: 'https://api.mapbox.com/v4/mapbox.satellite/{z}/{x}/{y}@2x.jpg?access_token={key}',
         parallelDownloads: 4,
-        gazeboVersion: 'harmonic'
+        gazeboVersion: 'harmonic',
+        targetHeightmapSize: 'auto'
     };
 
     const config = loadConfig();
@@ -76,6 +77,7 @@
         document.getElementById('setting-tile-source').value = config.tileSource;
         document.getElementById('setting-parallel-downloads').value = config.parallelDownloads;
         document.getElementById('setting-gazebo-version').value = config.gazeboVersion;
+        document.getElementById('setting-target-heightmap-size').value = config.targetHeightmapSize;
         updateMapboxKeyStatus(loadMapboxKey());
 
         const matchedSource = TILE_SOURCES.find(s => s && s.url === config.tileSource);
@@ -361,12 +363,14 @@
         console.log('Polygon created:', e.features);
         setGridVisible(false);
         updateCoordinateOverlays();
+        updateTextureSizeEstimate();
     }
 
     // Handle draw update event
     function onDrawUpdate(e) {
         console.log('Polygon updated:', e.features);
         updateCoordinateOverlays();
+        updateTextureSizeEstimate();
     }
 
     // Handle draw delete event
@@ -374,6 +378,7 @@
         console.log('Polygon deleted:', e.features);
         clearCoordinateOverlays();
         hideVertexDeletePopup();
+        updateTextureSizeEstimate();
     }
 
     // Handle selection change
@@ -876,6 +881,7 @@
             endData.append('polygonVertices', JSON.stringify(coords));
             endData.append('includeBuildings', includeBuildings);
             endData.append('gazeboVersion', config.gazeboVersion);
+            endData.append('targetHeightmapSize', config.targetHeightmapSize);
             endData.append('mapboxApiKey', mapboxApiKey);
             const endResp = await fetch('/end-download', { method: 'POST', body: endData });
             const endResult = await endResp.json();
@@ -1020,8 +1026,60 @@
         }
     }
 
+    // Populate Target Heightmap Size dropdown from backend (single source of truth)
+    async function populateHeightmapSizeDropdown() {
+        try {
+            const resp = await fetch('/valid-heightmap-sizes');
+            const result = await resp.json();
+            if (result.code === 200) {
+                const select = document.getElementById('setting-target-heightmap-size');
+                result.sizes.forEach(function (size) {
+                    const option = document.createElement('option');
+                    option.value = String(size);
+                    option.textContent = size + ' x ' + size;
+                    select.appendChild(option);
+                });
+                // Restore saved value now that options exist
+                select.value = config.targetHeightmapSize;
+            }
+        } catch (e) {
+            console.warn('Failed to load heightmap sizes:', e);
+        }
+    }
+
+    // Fetch and display heightmap + texture size estimates from the server
+    async function updateTextureSizeEstimate() {
+        const infoEl = document.getElementById('texture-size-info');
+        const features = draw.getAll().features;
+        if (features.length === 0) {
+            infoEl.textContent = '';
+            infoEl.classList.remove('visible');
+            return;
+        }
+        const coords = features[0].geometry.coordinates[0];
+        const data = new FormData();
+        data.append('polygonVertices', JSON.stringify(coords));
+        data.append('zoomLevel', config.zoomLevel);
+        data.append('tileSource', config.tileSource);
+        try {
+            const resp = await fetch('/estimate-texture-sizes', { method: 'POST', body: data });
+            const result = await resp.json();
+            if (result.code === 200) {
+                const hmLine = 'Heightmap: ' + result.natural_heightmap_width + 'x' + result.natural_heightmap_height + 'px -> Auto: ' + result.auto_heightmap_size + 'x' + result.auto_heightmap_size;
+                const texLine = 'Texture: ~' + result.natural_texture_padded + 'x' + result.natural_texture_padded + 'px';
+                infoEl.textContent = hmLine + '\n' + texLine;
+                infoEl.classList.add('visible');
+            }
+        } catch (e) {
+            console.warn('Size estimate failed:', e);
+        }
+    }
+
     // Setup settings panel
     function setupSettingsPanel() {
+        // Populate dropdowns from backend before applying saved config
+        populateHeightmapSizeDropdown();
+
         // Apply loaded/default config to form fields
         applyConfigToForm();
 
@@ -1074,6 +1132,7 @@
             config.zoomLevel = parseInt(this.value, 10) || 17;
             saveConfig();
             if (gridVisible) { showGrid(); }
+            updateTextureSizeEstimate();
         });
 
         document.getElementById('setting-include-buildings').addEventListener('change', function () {
@@ -1088,6 +1147,11 @@
 
         document.getElementById('setting-gazebo-version').addEventListener('change', function () {
             config.gazeboVersion = this.value;
+            saveConfig();
+        });
+
+        document.getElementById('setting-target-heightmap-size').addEventListener('change', function () {
+            config.targetHeightmapSize = this.value;
             saveConfig();
         });
 

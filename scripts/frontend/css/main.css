@@ -853,6 +853,20 @@ main {
     margin: 3px 0;
 }
 
+/* Texture/heightmap size estimate info */
+.texture-size-info {
+    margin-top: 6px;
+    font-size: 10px;
+    font-family: monospace;
+    color: rgba(255, 255, 255, 0.35);
+    line-height: 1.6;
+    display: none;
+}
+
+.texture-size-info.visible {
+    display: block;
+}
+
 /* Responsive design */
 @media (max-width: 768px) {
     #sidebar {

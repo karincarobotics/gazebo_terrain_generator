@@ -323,7 +323,14 @@
                             <size>$SIZEX$ $SIZEY$ $SIZEZ$</size>
                             <!-- OGRE2 ignores model/link <pose> for heightmaps; <pos> is world frame -->
                             <pos>$POSX$ $POSY$ $POSZ$</pos>
-                            <sampling>2</sampling>
+                            <!-- sampling: mesh vertices per heightmap pixel (SDF 1.8+ default = 1).
+                                 Tested with 16-bit heightmaps at sampling 1, 4, 8: no visual or
+                                 physics difference observed — OGRE2 interpolates extra vertices but
+                                 the result is indistinguishable at SRTM source resolution. Higher
+                                 values only increase vertex buffer memory (cost scales as sampling²).
+                                 sdformat PR #459 changed default from 2->1: "no good reason to
+                                 subsample by default". Explicitly set to 1 to match intent. -->
+                            <sampling>1</sampling>
                         </heightmap>
                     </geometry>
                 </visual>

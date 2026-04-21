@@ -2,7 +2,7 @@
 
 A web-based tool that generates self-contained Gazebo worlds from real-world satellite imagery and elevation data. Draw a polygon on a map, set a spawn location, and get a ready-to-use `.world` file with a textured heightmap and optional 3D buildings. Supports [Gazebo Harmonic](https://gazebosim.org/docs/harmonic/) and [Gazebo Fortress](https://gazebosim.org/docs/fortress/).
 
-Developed by [Karinca Robotics](https://karinca.com.tr) for [Polymath Robotics](https://polymathrobotics.com).
+Developed by [Karinca Robotics](https://karincarobotics.com) for [Polymath Robotics](https://polymathrobotics.com).
 Originally forked from [saiaravind19/gazebo_terrain_generator](https://github.com/saiaravind19/gazebo_terrain_generator).
 
 <p align="center">

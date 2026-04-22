@@ -196,7 +196,7 @@
         map = new mapboxgl.Map({
             container: 'map',
             style: 'mapbox://styles/mapbox/satellite-streets-v12',
-            center: [-86.246375, 39.778518], // Default: Allison Track
+            center: [-122.4194, 37.7749], // Default: San Francisco
             zoom: 12
         });
 
@@ -214,6 +214,7 @@
 
             // Add center marker after map loads
             addCenterMarker();
+            document.getElementById('coordinate-input').value = 'San Francisco';
 
             // Setup search button
             setupSearchButton();

@@ -48,16 +48,6 @@ class OrthoGenerator(ConcatImage):
         if tile_map is None or len(tile_map) == 0:
             raise ValueError(f"No tiles found in {tiles_dir} for zoom level {zoom_level}")
 
-        # gz-sim normalizes texture UV by size_x for both axes, so a non-square image
-        # causes the shorter dimension to be cut off. Pad to square with gray so all
-        # tiles remain visible regardless of bounding box aspect ratio.
-        h, w = stitched_image.shape[:2]
-        if h != w:
-            max_dim = max(h, w)
-            padded = np.full((max_dim, max_dim, 3), 128, dtype=np.uint8)
-            padded[:h, :w] = stitched_image
-            stitched_image = padded
-
         if GlobalParam.DEBUG_TILE_BORDERS:
             n_cols = x_max - x_min + 1
             n_rows = y_max - y_min + 1
@@ -80,6 +70,44 @@ class OrthoGenerator(ConcatImage):
                     cv2.putText(stitched_image, label, (text_x, text_y), font, 0.4, (0, 0, 0), 2)
                     cv2.putText(stitched_image, label, (text_x, text_y), font, 0.4, border_color, 1)
 
+        # Crop to polygon bounding box, removing tile-grid overhang on all sides
+        bound_array = self.boundaries.split(',')
+        lat_min = float(bound_array[1])
+        lat_max = float(bound_array[3])
+        lon_min = float(bound_array[0])
+        lon_max = float(bound_array[2])
+        tile_snap = MapTileUtils.get_true_boundaries(bound_array, zoom_level)
+        snap_lat_max = tile_snap["northeast"][0]
+        snap_lat_min = tile_snap["southwest"][0]
+        snap_lon_max = tile_snap["northeast"][1]
+        snap_lon_min = tile_snap["southwest"][1]
+        h, w = stitched_image.shape[:2]
+        px_w = int((lon_min - snap_lon_min) / (snap_lon_max - snap_lon_min) * w)
+        px_e = int((lon_max - snap_lon_min) / (snap_lon_max - snap_lon_min) * w)
+        py_n = int((snap_lat_max - lat_max) / (snap_lat_max - snap_lat_min) * h)
+        py_s = int((snap_lat_max - lat_min) / (snap_lat_max - snap_lat_min) * h)
+        stitched_image = stitched_image[py_n:py_s, px_w:px_e]
+
+        # Paint areas outside the selected polygon gray
+        h, w = stitched_image.shape[:2]
+        poly_pts = [
+            [int((lng - lon_min) / (lon_max - lon_min) * w),
+             int((lat_max - lat) / (lat_max - lat_min) * h)]
+            for lng, lat in self.polygon_vertices
+        ]
+        poly_mask = np.zeros((h, w), dtype=np.uint8)
+        cv2.fillPoly(poly_mask, [np.array(poly_pts, dtype=np.int32)], 255)
+        stitched_image[poly_mask == 0] = 128
+
+        # gz-sim normalizes texture UV by size_x for both axes, so a non-square image
+        # causes the shorter dimension to be cut off. Pad to square with gray so all
+        # tiles remain visible regardless of bounding box aspect ratio.
+        if h != w:
+            max_dim = max(h, w)
+            padded = np.full((max_dim, max_dim, 3), 128, dtype=np.uint8)
+            padded[:h, :w] = stitched_image
+            stitched_image = padded
+
         # Save the stitched image. Level 3 balances speed and file size —
         # level 9 (max) is extremely slow on large images with little extra size reduction.
         compression_params = [cv2.IMWRITE_PNG_COMPRESSION, 3]
@@ -98,6 +126,7 @@ class GazeboTerrainGenerator(HeightmapGenerator, OrthoGenerator):
         with open(os.path.join(self.tile_path, 'metadata.json')) as f:
             data = json.load(f)
             self.boundaries = data["bounds"]
+            self.polygon_vertices = data["polygon_vertices"]
             self.launch_location = data["launch_location"]
             self.zoom_level = data["zoom_level"]
             self.dem_resolution = data["dem_resolution"]
@@ -129,14 +158,9 @@ class GazeboTerrainGenerator(HeightmapGenerator, OrthoGenerator):
             Returns:
                 dict: A dictionary containing latitude, longitude, and altitude of the origin.
         """
-    
         bound_array = self.boundaries.split(',')
-        boundaries = MapTileUtils.get_true_boundaries(bound_array,self.zoom_level)
-
-        sw = boundaries["southwest"]
-        se = boundaries["southeast"]
-        ne = boundaries["northeast"]
-        origin_lon,origin_lat = float((se[1]+sw[1])/2),float((sw[0]+ne[0])/2) 
+        origin_lat = (float(bound_array[1]) + float(bound_array[3])) / 2
+        origin_lon = (float(bound_array[0]) + float(bound_array[2])) / 2
         return {
             "latitude": origin_lat,
             "longitude": origin_lon,
@@ -259,23 +283,24 @@ class GazeboTerrainGenerator(HeightmapGenerator, OrthoGenerator):
             tuple: A tuple containing size_x, size_y, size_z, and pose_z.
         """
         bound_array = self.boundaries.split(',')
-        true_boundaries = MapTileUtils.get_true_boundaries(bound_array, self.zoom_level)
-        
-        # Calculate map dimensions
-        sw = true_boundaries["southwest"]
-        se = true_boundaries["southeast"]
-        ne = true_boundaries["northeast"]
+        lat_min = float(bound_array[1])
+        lat_max = float(bound_array[3])
+        lon_min = float(bound_array[0])
+        lon_max = float(bound_array[2])
+        sw = (lat_min, lon_min)
+        se = (lat_min, lon_max)
+        ne = (lat_max, lon_max)
 
-        self.size_x = round(geodesic(sw, se).m, 2)  
-        self.size_y = round(geodesic(se, ne).m, 2)  
+        self.size_x = round(geodesic(sw, se).m, 2)
+        self.size_y = round(geodesic(se, ne).m, 2)
         self.size_z = round(self.max_height - self.min_height,2)
         origin_coord = self.get_true_origin()
         launch_location = self.get_launch_location()
         pose_x,pose_y = self.get_offset(origin_coord,launch_location)
         launch_px, launch_py = self.get_launch_pixelcord(
-            true_boundaries["southwest"], 
-            true_boundaries["northeast"], 
-            self.heightmap.size[0], 
+            sw,
+            ne,
+            self.heightmap.size[0],
             self.heightmap.size[1],
             launch_location
         )
@@ -311,9 +336,19 @@ class GazeboTerrainGenerator(HeightmapGenerator, OrthoGenerator):
                 terrain_data_dir = os.path.join(self.tile_path, 'terrain_data')
                 street_map = os.path.join(terrain_data_dir, 'buildings.geojson')
                 output_dae_file = os.path.join(terrain_data_dir, 'buildings.dae')
-                true_boundaries = MapTileUtils.get_true_boundaries(self.boundaries.split(','), self.zoom_level)
+                bound_array = self.boundaries.split(',')
+                lat_min = float(bound_array[1])
+                lat_max = float(bound_array[3])
+                lon_min = float(bound_array[0])
+                lon_max = float(bound_array[2])
+                polygon_bounds = {
+                    "southwest": (lat_min, lon_min),
+                    "southeast": (lat_min, lon_max),
+                    "northwest": (lat_max, lon_min),
+                    "northeast": (lat_max, lon_max),
+                }
                 geojson_to_dae = GeoJSONToDAE(street_map, output_dae_file)
-                geojson_to_dae.run(origin_coord, size_z, pose_z, self.heightmap, self.heightmap_z_resolution, true_boundaries)
+                geojson_to_dae.run(origin_coord, size_z, pose_z, self.heightmap, self.heightmap_z_resolution, polygon_bounds)
 
             progress("Writing world file...")
             self.gen_world(size_x, size_y, size_z, pose_x, pose_y, pose_z)

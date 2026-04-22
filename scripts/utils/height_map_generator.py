@@ -89,21 +89,26 @@ class HeightmapGenerator(ConcatImage):
 
     def generate_rgb_heightmap(self, tile_path, boundaries, zoomlevel, dem_path: str, dem_resolution: int, target_heightmap_size: int) -> None:
 
-        #get the true boundaries — there is non-uniform padding added by tile alignment
         bound_array = boundaries.split(',')
-        true_boundaries = MapTileUtils.get_true_boundaries(bound_array, zoomlevel)
-        true_bound_array = [true_boundaries["southwest"][1], true_boundaries["southwest"][0],
-                            true_boundaries["northeast"][1], true_boundaries["northeast"][0]]
+        lat_min = float(bound_array[1])
+        lat_max = float(bound_array[3])
+        lon_min = float(bound_array[0])
+        lon_max = float(bound_array[2])
+        polygon_bounds = {
+            "southwest": (lat_min, lon_min),
+            "southeast": (lat_min, lon_max),
+            "northwest": (lat_max, lon_min),
+            "northeast": (lat_max, lon_max),
+        }
 
         # Stitch all DEM tiles (no zoom filter — DEM dir contains only DEM tiles)
         stitched_image, _, _, _, _, _ = self.stitch_flat_tiles(dem_path, zoom_level=None)
 
-        # dem_snap_boundaries: the tile-aligned bounds of the stitched DEM image at DEM resolution,
-        # used to crop back down to the actual desired area (true_boundaries)
-        dem_snap_boundaries = MapTileUtils.get_true_boundaries(true_bound_array, dem_resolution)
+        # dem_snap_boundaries: tile-aligned extent of the stitched DEM image at DEM zoom
+        dem_snap_boundaries = MapTileUtils.get_true_boundaries(bound_array, dem_resolution)
 
         height, width = stitched_image.shape[:2]
-        crop_px_cord = self.get_dem_px_bounds(true_boundaries, dem_snap_boundaries, height, width)
+        crop_px_cord = self.get_dem_px_bounds(polygon_bounds, dem_snap_boundaries, height, width)
         # Crop the image based on the true boundaries needed
         cropped_image = self.crop_dem_image(crop_px_cord, stitched_image)
         height, width = cropped_image.shape[:2]
